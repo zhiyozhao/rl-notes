@@ -1,0 +1,1104 @@
+<!--S:1|记号表-->
+<h3>1.1 时间下标约定</h3>
+<p>先声明<strong>时间下标约定</strong>，这决定了所有公式长什么样。</p>
+<div class="callout warn">
+  <span class="label">本文采用 $(s_t,a_t,r_t,s_{t+1})$ 约定</span>
+  <p>在状态 $s_t$ 执行动作 $a_t$，环境<strong>立即</strong>返回奖励 $r_t$ 并转移到 $s_{t+1}$。</p>
+  <p>因此 $G_t=r_t+\gamma r_{t+1}+\gamma^2r_{t+2}+\cdots$，且 $G_t=r_t+\gamma G_{t+1}$。</p>
+  <p class="small">Sutton &amp; Barto 教材用 $r_{t+1}$（奖励与下一状态同步），只是下标偏移一位，公式结构完全相同。读论文时先确认它用哪一种，否则差一位。</p>
+</div>
+
+<h3>1.2 核心符号</h3>
+<table>
+  <thead><tr><th>符号</th><th>含义</th></tr></thead>
+  <tbody>
+    <tr><td>$\mathcal{S},\ \mathcal{A}$</td><td>状态空间、动作空间</td></tr>
+    <tr><td>$s_t,\ a_t,\ r_t$</td><td>第 $t$ 步的状态、动作、奖励</td></tr>
+    <tr><td>$P(s'|s,a)$</td><td>转移概率（环境规则，不可改）</td></tr>
+    <tr><td>$R(s,a)$</td><td>期望即时奖励 $\mathbb{E}[r_t\mid s_t=s,a_t=a]$</td></tr>
+    <tr><td>$\gamma\in[0,1)$</td><td>折扣因子</td></tr>
+    <tr><td>$\pi(a|s)$</td><td>策略（状态到动作分布的映射）</td></tr>
+    <tr><td>$G_t$</td><td>从 $t$ 起的折扣回报</td></tr>
+    <tr><td>$V^\pi(s),\ Q^\pi(s,a)$</td><td>状态价值、动作价值</td></tr>
+    <tr><td>$A^\pi(s,a)$</td><td>优势 $=Q^\pi-V^\pi$</td></tr>
+    <tr><td>$V^*,\ Q^*,\ \pi^*$</td><td>最优值函数与最优策略</td></tr>
+    <tr><td>$\mathcal{T}$</td><td>Bellman 算子</td></tr>
+    <tr><td>$\delta_t$</td><td>TD 误差</td></tr>
+    <tr><td>$\alpha$</td><td>学习率 / 步长</td></tr>
+    <tr><td>$\theta$</td><td>策略参数；$\mathbf{w}$ 为值函数参数</td></tr>
+    <tr><td>$\lambda$</td><td>TD(λ) 的迹衰减系数</td></tr>
+    <tr><td>$b(s)$</td><td>POMDP 下的信念</td></tr>
+    <tr><td>$d^\pi(s)$</td><td>策略 $\pi$ 下的状态分布</td></tr>
+    <tr><td>$D_{KL}(p\|q)$</td><td>KL 散度</td></tr>
+  </tbody>
+</table>
+
+<h3>1.3 三个容易混的地方</h3>
+<div class="callout">
+  <span class="label">必须分清</span>
+  <p><strong>状态 $s$ vs 观测 $o$</strong>：$s$ 是世界的完整真相，$o$ 是你能看到的部分。</p>
+  <p><strong>奖励 $r$ vs 价值 $V$</strong>：$r$ 是"这一步得了多少分"，$V$ 是"从这往后总共能得多少分"。</p>
+  <p><strong>转移 $P$ vs 策略 $\pi$</strong>：$P$ 是<strong>世界</strong>的规则（你改不了），$\pi$ 是<strong>你</strong>的规则（你能改）。</p>
+</div>
+<!--/S-->
+
+<!--S:2|MDP：把决策问题写成数学-->
+<h3>2.1 五元组</h3>
+<div class="math">$$\mathcal{M}=(\mathcal{S},\ \mathcal{A},\ P,\ R,\ \gamma)$$</div>
+<p>有时带初始分布 $\rho_0(s)$，写成六元组。核心是前五个。</p>
+<div class="math">$$P(s'|s,a)=\Pr\big(s_{t+1}=s'\ \big|\ s_t=s,\ a_t=a\big)$$</div>
+<div class="math">$$R(s,a)=\mathbb{E}\big[r_t\ \big|\ s_t=s,\ a_t=a\big]$$</div>
+<p class="read"><b>读法：</b>$P$ 回答"我这么做，世界会去哪"，$R$ 回答"这一步值多少分"。两者都是<strong>环境的属性</strong>。</p>
+
+<h3>2.2 轨迹与回报</h3>
+<div class="math">$$\tau=(s_0,a_0,r_0,s_1,a_1,r_1,\dots)$$</div>
+<div class="def">
+  <div class="t">折扣回报</div>
+  <div class="math">$$G_t=\sum_{k=0}^{\infty}\gamma^{k}r_{t+k}=r_t+\gamma r_{t+1}+\gamma^2r_{t+2}+\cdots$$</div>
+  <p>递推形式：$G_t=r_t+\gamma G_{t+1}$。这个恒等式是后面所有算法的基础。</p>
+</div>
+<p><strong>为什么必须 $\gamma\lt1$？</strong></p>
+<ol>
+  <li><strong>数学上</strong>：若 $|r|\le R_{\max}$，则 $|G_t|\le R_{\max}/(1-\gamma)$，有界。否则和可能发散。</li>
+  <li><strong>物理上</strong>：越远的未来越不可控、越不确定，晚到的奖励应当打折。</li>
+</ol>
+<p><strong>有效视野</strong>：折扣后第 $n$ 步的权重是 $\gamma^n$；权重分布的重心约为 $1/(1-\gamma)$。$\gamma=0.99$ → 约 100 步。</p>
+
+<h3>2.3 策略与值函数</h3>
+<div class="math">$$\pi(a|s)=\Pr(a_t=a\mid s_t=s)$$</div>
+<div class="math">$$V^\pi(s)=\mathbb{E}_{\tau\sim\pi}\Big[G_t\ \Big|\ s_t=s\Big]$$</div>
+<div class="math">$$Q^\pi(s,a)=\mathbb{E}_{\tau\sim\pi}\Big[G_t\ \Big|\ s_t=s,\ a_t=a\Big]$$</div>
+<div class="math">$$A^\pi(s,a)=Q^\pi(s,a)-V^\pi(s)$$</div>
+<p class="read"><b>读法：</b>$V$ 是"站在这里值多少"，$Q$ 是"从这里先做这个动作值多少"，$A$ 是"这个动作比平均水平好多少"。</p>
+<p>两个恒等关系：</p>
+<div class="math">$$V^\pi(s)=\sum_a \pi(a|s)\,Q^\pi(s,a),\qquad Q^\pi(s,a)=R(s,a)+\gamma\sum_{s'}P(s'|s,a)V^\pi(s')$$</div>
+<!--/S-->
+
+<!--S:3|Bellman 方程-->
+<h3>3.1 期望方程（给定策略）</h3>
+<p>把 $G_t=r_t+\gamma G_{t+1}$ 代入 $V^\pi$ 的定义，两边取期望：</p>
+<div class="math">$$V^\pi(s)=\sum_{a}\pi(a|s)\left[R(s,a)+\gamma\sum_{s'}P(s'|s,a)\,V^\pi(s')\right]$$</div>
+<div class="math">$$Q^\pi(s,a)=R(s,a)+\gamma\sum_{s'}P(s'|s,a)\sum_{a'}\pi(a'|s')\,Q^\pi(s',a')$$</div>
+<p class="read"><b>读法：</b>一个状态的价值 = 按策略加权，每个动作的即时奖励 + 打折后的下一状态价值。</p>
+<p><strong>矩阵形式</strong>（有限状态）：</p>
+<div class="math">$$\mathbf{v}^\pi=\mathbf{r}^\pi+\gamma P^\pi\mathbf{v}^\pi\quad\Longrightarrow\quad \mathbf{v}^\pi=(I-\gamma P^\pi)^{-1}\mathbf{r}^\pi$$</div>
+<p class="small">其中 $P^\pi_{ss'}=\sum_a\pi(a|s)P(s'|s,a)$，$r^\pi_s=\sum_a\pi(a|s)R(s,a)$。$(I-\gamma P^\pi)$ 可逆：$P^\pi$ 是行随机矩阵，$\|\gamma P^\pi\|_\infty=\gamma\lt1$，故 Neumann 级数 $\sum_{k\ge0}(\gamma P^\pi)^k$ 收敛，正是它的逆。</p>
+
+<h3>3.2 最优方程</h3>
+<div class="math">$$V^*(s)=\max_{a}\left[R(s,a)+\gamma\sum_{s'}P(s'|s,a)V^*(s')\right]$$</div>
+<div class="math">$$Q^*(s,a)=R(s,a)+\gamma\sum_{s'}P(s'|s,a)\max_{a'}Q^*(s',a')$$</div>
+<div class="callout warn">
+  <span class="label">最优方程是<strong>非线性</strong>的</span>
+  <p>因为里面有 $\max$。$V^\pi$ 的方程是线性的（可以矩阵求逆），但 $V^*$ 的方程不是，只能迭代求解。</p>
+  <p>这就是为什么：<strong>策略评估</strong>可以一次解出，<strong>最优控制</strong>必须反复迭代。</p>
+</div>
+
+<h3>3.3 存在性与唯一性：压缩映射</h3>
+<p>定义 Bellman 最优算子：</p>
+<div class="math">$$(\mathcal{T}V)(s)=\max_{a}\left[R(s,a)+\gamma\sum_{s'}P(s'|s,a)V(s')\right]$$</div>
+<p>$V^*$ 是 $\mathcal{T}$ 的不动点：$V^*=\mathcal{T}V^*$。</p>
+<div class="def">
+  <div class="t">定理（γ-压缩）</div>
+  <p>对任意两个值函数 $V_1,V_2$：</p>
+  <div class="math">$$\|\mathcal{T}V_1-\mathcal{T}V_2\|_\infty\ \le\ \gamma\,\|V_1-V_2\|_\infty$$</div>
+  <p>由 Banach 不动点定理，$\mathcal{T}$ 有唯一不动点 $V^*$，且从任意 $V_0$ 出发迭代 $V_{k+1}=\mathcal{T}V_k$ 都收敛到它。</p>
+</div>
+<p><strong>证明（四行）：</strong>记 $f_1(a)=R(s,a)+\gamma\sum_{s'}P(s'|s,a)V_1(s')$，$f_2$ 同理。</p>
+<div class="math">$$\begin{aligned}
+\left|(\mathcal{T}V_1)(s)-(\mathcal{T}V_2)(s)\right|
+&=\left|\max_a f_1(a)-\max_a f_2(a)\right|\\
+&\le\max_a\left|f_1(a)-f_2(a)\right|\\
+&\le\max_a\ \gamma\sum_{s'}P(s'|s,a)\left|V_1(s')-V_2(s')\right|\\
+&\le\gamma\|V_1-V_2\|_\infty
+\end{aligned}$$</div>
+<p>对 $s$ 取上确界即得。$\square$</p>
+<p><strong>收敛速度</strong>（几何收敛）：</p>
+<div class="math">$$\|V_k-V^*\|_\infty\ \le\ \frac{\gamma^k}{1-\gamma}\,\|V_1-V_0\|_\infty$$</div>
+<p class="read"><b>读法：</b>每迭代一次，误差至少缩到 $\gamma$ 倍。$\gamma=0.99$ 时要迭代几百次才收敛到小数点后几位。</p>
+
+<h3>3.4 为什么必须是 $\gamma\lt1$</h3>
+<p>若 $\gamma=1$，$\mathcal{T}$ 只是非扩张（1-Lipschitz），不动点可能不唯一。例如一个"每一步奖励 0"的 MDP，任意常数函数都是不动点。</p>
+<!--/S-->
+
+<!--S:4|策略改进与收敛-->
+<div class="def">
+  <div class="t">策略改进定理</div>
+  <p>给定 $\pi$，令</p>
+  <div class="math">$$\pi'(s)=\arg\max_a Q^\pi(s,a)$$</div>
+  <p>则对所有 $s$：$V^{\pi'}(s)\ge V^\pi(s)$。若 $\pi$ 已经是最优的，则取等号。</p>
+</div>
+<p><strong>证明思路（一步 + 归纳）：</strong></p>
+<div class="math">$$V^{\pi}(s)\le\max_a Q^{\pi}(s,a)=Q^{\pi}(s,\pi'(s))
+=\mathbb{E}\big[r_t+\gamma V^{\pi}(s_{t+1})\big]
+\le\mathbb{E}\big[r_t+\gamma V^{\pi'}(s_{t+1})\big]\le\cdots\le V^{\pi'}(s)$$</div>
+<p>最后一步把同样的论证沿轨迹反复展开 $T$ 步，余项 $\gamma^T R_{\max}/(1-\gamma)\to0$。</p>
+<div class="callout blue">
+  <span class="label">这是整个 RL 的"改进引擎"</span>
+  <p>所有基于价值的方法，本质上都在做同一件事：<strong>用当前的 $Q$ 造一个更好的策略，再用更好的策略改进 $Q$，循环。</strong></p>
+  <p>策略迭代、价值迭代、Q-learning、DQN、MuZero 全是这个循环的变体。</p>
+</div>
+<!--/S-->
+
+<!--S:5|POMDP 与信念-->
+<h3>5.1 定义</h3>
+<div class="math">$$\mathcal{M}_{POMDP}=(\mathcal{S},\mathcal{A},P,R,\gamma,\mathcal{O},O)$$</div>
+<div class="math">$$o_t\sim O(o\mid s),\qquad b_t(s)=\Pr\big(s_t=s\mid o_{0:t},a_{0:t-1}\big)$$</div>
+
+<h3>5.2 贝叶斯滤波</h3>
+<div class="math">$$b_{t+1}(s')=\frac{O(o_{t+1}\mid s')\displaystyle\sum_{s}P(s'\mid s,a_t)\,b_t(s)}
+{\displaystyle\sum_{s''}O(o_{t+1}\mid s'')\displaystyle\sum_{s}P(s''\mid s,a_t)\,b_t(s)}$$</div>
+<p class="read"><b>读法：</b>先用动力学把旧信念推进到下一时刻（预测），再用新观测的似然去加权（校正），最后归一化。</p>
+<p>分母就是证据 $\Pr(o_{t+1}\mid b_t,a_t)$，也就是"这个观测有多意外"。</p>
+
+<h3>5.3 信念 MDP：把"不知道"当成一种状态</h3>
+
+<h4>5.3.1 它要解决什么</h4>
+<p>MDP 里的 Bellman 方程长这样：</p>
+<div class="math">$$V(s)=\max_a\Big[R(s,a)+\gamma\sum_{s'}P(s'|s,a)V(s')\Big]$$</div>
+<p>它要求你<strong>知道 $s$</strong>。但在 POMDP 里你不知道 $s$，你手上只有一个分布 $b$。</p>
+<p>于是自然的问题：<strong>能不能把 $b$ 当成新的"状态"，套用同一个 Bellman 结构？</strong></p>
+<p>能。前提是 $b$ 必须是<strong>充分统计量</strong>——给定 $b_t$，未来的观测分布和奖励分布与更早的历史无关。这一点成立，因为：</p>
+<div class="math">$$b_{t+1}=\tau(b_t,\ a_t,\ o_{t+1})$$</div>
+<p class="read"><b>读法：</b>下一时刻的信念只由"当前信念 + 这一动作 + 新观测"决定，不需要往回翻历史。<strong>所以一旦有了 $b$，整段历史就可以扔掉。</strong></p>
+
+<h4>5.3.2 公式逐项拆开</h4>
+<div class="math">$$V^*(b)=\max_{a}\Big[\underbrace{\sum_s b(s)R(s,a)}_{\text{(1) 即时期望奖励}}+\gamma\underbrace{\sum_{o'}\Pr(o'\mid b,a)\,V^*\big(\tau(b,a,o')\big)}_{\text{(2) 按看到什么加权的未来}}\Big]$$</div>
+<table>
+  <thead><tr><th>项</th><th>是什么</th><th>对应 MDP 里的什么</th></tr></thead>
+  <tbody>
+    <tr><td>(1) $\sum_s b(s)R(s,a)$</td><td>不知道 $s$，就按 $b$ 对 $R(s,a)$ 加权平均</td><td>就是 $R(s,a)$，只是从"确定"变成"期望"</td></tr>
+    <tr><td>(2) $\sum_{o'}\Pr(o'|b,a)V^*(\tau)$</td><td>下一步的"状态"不再是 $s'$，而是<strong>新信念</strong> $\tau$；而 $\tau$ 取决于你看到了什么 $o'$，所以要对 $o'$ 加权</td><td>对应 $\gamma\sum_{s'}P(s'|s,a)V(s')$</td></tr>
+  </tbody>
+</table>
+<div class="callout blue">
+  <span class="label">一句话看懂这个换元</span>
+  <p><strong>MDP：</strong>做了 $a$ 之后，世界去 $s'$，按 $P(s'|s,a)$ 加权。</p>
+  <p><strong>POMDP：</strong>做了 $a$ 之后，<strong>我的认知</strong>去 $b'$，按"我会看到什么"加权。</p>
+  <p>状态从"世界是什么样"变成了"我认为世界是什么样"。其余结构一模一样。</p>
+</div>
+
+<h4>5.3.3 $\Pr(o'|b,a)$ 和 $\tau$ 到底从哪来</h4>
+<p><strong>先算"做 $a$ 之后看到 $o'$ 的概率"</strong>（全概率公式）：</p>
+<div class="math">$$\Pr(o'\mid b,a)=\sum_{s'}O(o'\mid s')\underbrace{\sum_{s}P(s'\mid s,a)\,b(s)}_{\text{预测的下一状态分布}}$$</div>
+<p class="read"><b>读法：</b>先用动力学把信念推到下一时刻，再看每种下一状态产生观测 $o'$ 的可能性。</p>
+<p><strong>再算新信念</strong>（贝叶斯更新，就是 5.2 那个式子）：</p>
+<div class="math">$$\tau(b,a,o')(s')=\frac{O(o'\mid s')\displaystyle\sum_{s}P(s'\mid s,a)\,b(s)}{\Pr(o'\mid b,a)}$$</div>
+<p class="read"><b>读法：</b>分子是 5.2 的分子，分母正好是上面算的那个概率。所以在公式里，$\tau$ 和 $\Pr(o'|b,a)$ 是<strong>同一份计算的两半</strong>。</p>
+<div class="callout warn">
+  <span class="label">为什么 (2) 那一项是 POMDP 的灵魂</span>
+  <p>注意 $\Pr(o'|b,a)$ 里含 $a$：<strong>不同的动作会带来不同的观测分布</strong>。</p>
+  <p>这就是"信息"进入价值函数的地方。减速能让你看得更清楚 → 观测分布更极端 → 新信念更快地靠近 0 或 1 → 后续决策更准。这一整条链路，都被 (2) 这一项自动折算成分数。</p>
+  <p>（在 MDP 里没有这一层，因为状态直接可见。）</p>
+</div>
+
+<h4>5.3.4 为什么叫"连续状态空间"</h4>
+<p>信念不是随便一个向量，它必须满足：</p>
+<div class="math">$$b\in\Delta(\mathcal{S})=\Big\{b:\ b(s)\ge0,\ \sum_s b(s)=1\Big\}$$</div>
+<p>这叫<strong>单纯形</strong>。如果 $|\mathcal{S}|=2$，它就是一条线段 $[0,1]$；如果是 3，就是一个三角形。</p>
+<div class="callout bad">
+  <span class="label">精确说法</span>
+  <p>它不是"无限维"——维度是 $|\mathcal{S}|-1$，有限。但它上面的<strong>点有无穷多个（不可数）</strong>。</p>
+  <p>所以 $V^*(b)$ 是一个定义在连续统上的函数，<strong>不能建表</strong>。这就是为什么 POMDP 精确求解在一般情形下不可行，只能近似（点集近似、策略梯度、或直接用神经网络拟合 $V^*(b)$）。</p>
+</div>
+
+<h4>5.3.5 手算一个最小例子：门口有没有人</h4>
+<p><strong>设定：</strong></p>
+<table>
+  <thead><tr><th>元素</th><th>取值</th></tr></thead>
+  <tbody>
+    <tr><td>状态 $\mathcal{S}$</td><td>$H$＝有人，$N$＝没人。<strong>状态静止</strong>：$P(s'|s,a)=1$</td></tr>
+    <tr><td>动作 $\mathcal{A}$</td><td>通过 <code>go</code>、减速看 <code>brake</code></td></tr>
+    <tr><td>观测 $\mathcal{O}$</td><td>看到 <code>see</code>、没看到 <code>none</code></td></tr>
+    <tr><td>奖励</td><td>$R(H,\text{go})=-100$，$R(N,\text{go})=+10$，$R(H,\text{brake})=-1$，$R(N,\text{brake})=0$</td></tr>
+    <tr><td>观测模型</td><td><strong>通过</strong>：$O(\text{see}|H)=0.2$，$O(\text{see}|N)=0.05$<br><strong>减速</strong>：$O(\text{see}|H)=0.95$，$O(\text{see}|N)=0.05$</td></tr>
+  </tbody>
+</table>
+<p><strong>先看一步（$\gamma=0$）</strong>：$V_1(b)=\max_a\sum_s b(s)R(s,a)$</p>
+<table>
+  <thead><tr><th>信念</th><th>通过</th><th>减速</th><th>选</th></tr></thead>
+  <tbody>
+    <tr><td>$b(H)=0.10$</td><td>$0.1(-100)+0.9(10)=-1$</td><td>$0.1(-1)+0.9(0)=-0.1$</td><td><strong>减速</strong></td></tr>
+    <tr><td>$b(H)=0.02$</td><td>$0.02(-100)+0.98(10)=7.8$</td><td>$-0.02$</td><td><strong>通过</strong></td></tr>
+  </tbody>
+</table>
+<p>临界点解 $10-110b=-b$，得 $b=\frac{10}{109}\approx9.17\%$。<strong>信念超过 9.17% 就减速。</strong></p>
+<p><strong>再看两步（取 $\gamma=1$，把 (2) 那一项算出来）</strong>：</p>
+<div class="math">$$V_2(b)=\max_a\Big[\sum_s b(s)R(s,a)+\sum_{o'}\Pr(o'|b,a)\,V_1\big(\tau(b,a,o')\big)\Big]$$</div>
+<p>取 $b(H)=0.05$。</p>
+<div class="grid2">
+  <div class="box">
+    <h4>走 <code>go</code></h4>
+<pre><code>即时 = 0.05×(−100) + 0.95×10 = +4.50
+
+看到 see 的概率 = 0.05×0.2 + 0.95×0.05 = 0.0575
+  新信念 b'(H) = 0.010 / 0.0575 = 0.174
+  0.174 &gt; 9.17% → 下一轮选 brake → V₁ = −0.174
+
+没看到的概率 = 0.9425
+  新信念 b'(H) = 0.040 / 0.9425 = 0.0424
+  0.0424 &lt; 9.17% → 下一轮选 go → V₁ = 5.33
+
+未来项 = 0.0575×(−0.174) + 0.9425×5.33 = 5.02
+总计   = 4.50 + 5.02 = 9.51</code></pre>
+  </div>
+  <div class="box">
+    <h4>走 <code>brake</code></h4>
+<pre><code>即时 = 0.05×(−1) + 0.95×0 = −0.05
+
+看到 see 的概率 = 0.05×0.95 + 0.95×0.05 = 0.095
+  新信念 b'(H) = 0.0475 / 0.095 = 0.500
+  0.500 &gt; 9.17% → 下一轮选 brake → V₁ = −0.500
+
+没看到的概率 = 0.905
+  新信念 b'(H) = 0.0025 / 0.905 = 0.0028
+  0.0028 &lt; 9.17% → 下一轮选 go → V₁ = 9.70
+
+未来项 = 0.095×(−0.5) + 0.905×9.70 = 8.73
+总计   = −0.05 + 8.73 = 8.68</code></pre>
+  </div>
+</div>
+<p><strong>结论：9.51 &gt; 8.68，取 <code>go</code>。</strong>在 5% 的风险下，减速探视的代价（放弃 +4.5 的即时收益）超过了它带来的信息收益。</p>
+<p>但如果把先验提到 $b(H)=0.10$，同样的计算给出 <code>go</code> = $-0.47$、<code>brake</code> = $7.86$，<strong>结论翻转</strong>。</p>
+<div class="callout">
+  <span class="label">这组数字到底在说什么</span>
+  <p>看 <code>brake</code> 那一列：减速把"看到人"时的信念从 <strong>17.4% 拉到 50%</strong>（更快确认），把"没看到"之后的信念从 <strong>4.2% 压到 0.28%</strong>（更放心）。</p>
+  <p>这些信念变化本身不产生任何奖励，但它们<strong>改变了下一轮决策的质量</strong>。(2) 那一项就是把这个质量折算成分数的机制。</p>
+  <p><strong>这就是"认知价值"在公式里的位置：它不在奖励里，而在"下一状态的分布"里。</strong></p>
+</div>
+
+<h4>5.3.6 为什么这就解释了 RNN / Transformer</h4>
+<p>真实场景里 $|\mathcal{S}|$ 巨大（图像状态甚至是连续的），<strong>你不可能显式地维护 $b$</strong>——那是一个几百万维的向量。</p>
+<p>但 5.2 的更新有一个固定的<strong>递归形式</strong>：$b_{t+1}=f(b_t,a_t,o_{t+1})$。所以你可以不去算真实的 $b$，而是<strong>学一个递归函数来逼近它</strong>：</p>
+<div class="math">$$h_t=f_\theta(h_{t-1},\ a_{t-1},\ o_t)\ \approx\ \text{一个与 }b_t\text{ 等价的充分统计量}$$</div>
+<p class="read"><b>读法：</b>$h_t$ 是网络内部的一个向量，它不需要真的等于 $b_t$，只需要"携带同样的决策所需信息"。</p>
+<table>
+  <thead><tr><th>理论</th><th>工程对应</th></tr></thead>
+  <tbody>
+    <tr><td>信念 $b_t$</td><td>RNN / LSTM / GRU 的隐状态 $h_t$</td></tr>
+    <tr><td>贝叶斯更新 $\tau$</td><td>RNN 的一个前向步</td></tr>
+    <tr><td>长历史依赖</td><td>Transformer 的 attention（在整段历史上重新加权）</td></tr>
+    <tr><td>世界模型里的 RSSM</td><td>确定性记忆 $h_t$ + 随机信念 $z_t$ 的显式分工</td></tr>
+  </tbody>
+</table>
+<div class="callout">
+  <span class="label">一句话把三件事串起来</span>
+  <p><strong>POMDP</strong> 说：决策应该基于信念。</p>
+  <p><strong>信念</strong>是一个递归更新的量：$b_{t+1}=f(b_t,a_t,o_{t+1})$。</p>
+  <p><strong>世界模型</strong>就是把这个 $f$ 学出来（并加上对未来的预测）。所以"带记忆的网络"和"世界模型"在理论上是同一件事的两种说法。</p>
+</div>
+
+<h4>5.3.7 三句话总结</h4>
+<ol>
+  <li><strong>换状态</strong>：把 $b$ 当状态，POMDP 就变成 MDP，Bellman 结构完全保留。</li>
+  <li><strong>换下一步</strong>：下一步不是 $s'$，而是新信念 $\tau(b,a,o')$，按"会看到什么"加权。</li>
+  <li><strong>代价</strong>：状态空间从有限变连续（单纯形上不可数多个点），不能建表，只能函数逼近——而这正好就是神经网络。</li>
+</ol>
+<!--/S-->
+<!--S:6|蒙特卡洛：用完整回报做样本-->
+<h3>6.1 从均值估计说起</h3>
+<p>要估 $\mathbb{E}[X]$，最朴素的办法是采样求平均。<strong>增量式</strong>写法：</p>
+<div class="math">$$\mu_k=\mu_{k-1}+\frac{1}{k}\big(x_k-\mu_{k-1}\big)$$</div>
+<p>把 $1/k$ 换成常数 $\alpha$，就得到"指数加权平均"，可以跟踪非平稳分布。这是所有 RL 更新式的原型。</p>
+
+<h3>6.2 首次访问与每次访问</h3>
+<div class="grid2">
+  <div class="box">
+    <h4>First-visit MC</h4>
+    <p class="small">一个 episode 里，状态 $s$ 只在<strong>第一次</strong>被访问时计入。</p>
+  </div>
+  <div class="box">
+    <h4>Every-visit MC</h4>
+    <p class="small">每次访问都计入。两者都收敛到 $V^\pi$（前者无偏，后者渐近无偏）。</p>
+  </div>
+</div>
+<div class="math">$$V(s_t)\leftarrow V(s_t)+\alpha\big[G_t-V(s_t)\big]$$</div>
+<div class="callout">
+  <span class="label">为什么会有"访问多次"</span>
+  <p>因为状态转移<strong>有环</strong>：绕一圈回到同一个路口、在停车场转回来、随机策略让你退回上一步。</p>
+  <p>如果环境<strong>无环</strong>（每步都往前走），一个状态最多出现一次，两种方法<strong>完全一样</strong>。</p>
+</div>
+
+<h3>6.3 无偏性</h3>
+<p>因为 $G_t$ 就是 $V^\pi(s_t)$ 定义里那个随机变量的一次实现：</p>
+<div class="math">$$\mathbb{E}\big[G_t\mid s_t=s\big]=V^\pi(s)$$</div>
+<p>所以样本均值按大数定律收敛，<strong>不需要任何东西是"对的"</strong>。代价是必须等 episode 结束。</p>
+<p><strong>为什么 every-visit 只是"渐近"无偏？</strong>它的估计量是"总回报 ÷ 总访问次数"，是一个<strong>比值</strong>；分母随机且与分子相关，而 $\mathbb{E}[A/B]\ne\mathbb{E}[A]/\mathbb{E}[B]$。局数越多偏差越小，极限处收敛。</p>
+
+<h3>6.4 方差</h3>
+<p>若各步奖励独立（近似假设）：</p>
+<div class="math">$$\operatorname{Var}(G_t)=\sum_{k=0}^{\infty}\gamma^{2k}\operatorname{Var}(r_{t+k})$$</div>
+<p>即使 $\gamma\lt1$ 让和收敛，$\gamma$ 接近 1 时方差仍然很大。</p>
+<div class="callout bad">
+  <span class="label">MC 的三个问题</span>
+  <p><strong>① 必须等回合结束</strong>（不能用于持续性任务）<br>
+     <strong>② 方差大</strong>（一路的偶然全吃进去）<br>
+     <strong>③ 不能在线学习</strong>（要等很久才更新一次）</p>
+</div>
+<!--/S-->
+
+<!--S:7|TD(0)：走一步就更新-->
+<h3>7.1 TD 误差</h3>
+<div class="def">
+  <div class="t">TD 误差</div>
+  <div class="math">$$\delta_t=r_t+\gamma V(s_{t+1})-V(s_t)$$</div>
+  <p>它是"新估计"与"旧估计"之差。更新：</p>
+  <div class="math">$$V(s_t)\leftarrow V(s_t)+\alpha\,\delta_t$$</div>
+</div>
+<p class="read"><b>读法：</b>$r_t+\gamma V(s_{t+1})$ 是"走了一步之后，我重新认为 $V(s_t)$ 应该是多少"；$V(s_t)$ 是"我原来认为是多少"。差值就是我要修正的量。</p>
+
+<h3>7.2 为什么它是"对的"</h3>
+<p>如果 $V=V^\pi$，那么由 Bellman 期望方程：</p>
+<div class="math">$$\mathbb{E}\big[\delta_t\mid s_t=s\big]=\mathbb{E}\big[r_t+\gamma V^\pi(s_{t+1})\big]-V^\pi(s)=0$$</div>
+<p>也就是说，<strong>TD 误差在真值处期望为零</strong>。它是一颗"无偏的噪声信号"，虽然单次不为零。</p>
+<p>这就是 TD 能收敛的根本原因：它优化的不动点恰好是 Bellman 方程的解。</p>
+
+<h3>7.3 偏差从哪来</h3>
+<p>更新目标里含 $V(s_{t+1})$，而它是<strong>估计</strong>。这叫<strong>自举（bootstrapping）</strong>。</p>
+<p>严格地说，TD(0) 的更新是<strong>半梯度</strong>的：它把目标 $r+\gamma V(s_{t+1})$ 当作常数，不对其中的 $V(s_{t+1})$ 求梯度。所以它并不是在最小化任何真实的损失函数。</p>
+
+<h3>7.4 收敛条件</h3>
+<div class="def">
+  <div class="t">Robbins–Monro 条件</div>
+  <p>表格型 TD(0) 以概率 1 收敛到 $V^\pi$，当且仅当步长满足：</p>
+  <div class="math">$$\sum_{t=1}^{\infty}\alpha_t=\infty,\qquad \sum_{t=1}^{\infty}\alpha_t^{2}\lt\infty$$</div>
+  <p>第一条保证能走到任意远处，第二条保证噪声最终被平均掉。$\alpha_t=1/t$ 满足；常数 $\alpha$ 不满足（但实践中常用常数，因为能跟踪非平稳性）。</p>
+</div>
+
+<h3>7.5 TD vs MC：一张对照</h3>
+<table>
+  <thead><tr><th></th><th>MC</th><th>TD(0)</th></tr></thead>
+  <tbody>
+    <tr><td>目标</td><td>$G_t$</td><td>$r_t+\gamma V(s_{t+1})$</td></tr>
+    <tr><td>自举</td><td>否</td><td>是</td></tr>
+    <tr><td>偏差</td><td>无偏</td><td>有偏（除非 $V$ 已准）</td></tr>
+    <tr><td>方差</td><td>大</td><td>小</td></tr>
+    <tr><td>更新时机</td><td>回合末</td><td>每一步</td></tr>
+    <tr><td>能否在线</td><td>否</td><td>是</td></tr>
+    <tr><td>对模型误差</td><td>免疫</td><td>敏感</td></tr>
+  </tbody>
+</table>
+<div class="callout blue">
+  <span class="label">一句好记的总结</span>
+  <p><strong>MC 用"事实"当老师，TD 用"猜测"当老师。</strong>事实可靠但来得慢；猜测来得快但可能是错的。</p>
+</div>
+<!--/S-->
+
+<!--S:8|n 步回报与 TD(λ)-->
+<p>这一节是全书最绕的地方。我们分六步走，每一步都配一条具体的轨迹。</p>
+
+<h3>8.1 先回顾：为什么需要 n</h3>
+<table>
+  <thead><tr><th></th><th>MC</th><th>TD(0)</th></tr></thead>
+  <tbody>
+    <tr><td>用什么当目标</td><td>$G_t$（真的走到底）</td><td>$r_t+\gamma V(s_{t+1})$（只走一步）</td></tr>
+    <tr><td>偏差</td><td>0</td><td>有（$V$ 不准就偏）</td></tr>
+    <tr><td>方差</td><td>大</td><td>小</td></tr>
+    <tr><td>要不要等</td><td>要等整局结束</td><td>走一步就能更新</td></tr>
+  </tbody>
+</table>
+<p><strong>n 步就是在两者之间选一个中间点。</strong></p>
+
+<h3>8.2 n 步回报是什么</h3>
+<div class="math">$$G_t^{(n)}=r_t+\gamma r_{t+1}+\gamma^2 r_{t+2}+\cdots+\gamma^{n-1}r_{t+n-1}+\gamma^n V(s_{t+n})$$</div>
+<p class="read"><b>读法：</b>真的往前推 n 步，拿真实奖励；第 n 步之后的部分，用价值估计一次性补上。</p>
+<p>$n=1$ 就退化成 TD(0)，$n=T-t$ 就退化成 MC。</p>
+
+<h4>一条具体轨迹</h4>
+<pre><code>s0 --1--> s1 --1--> s2 --1--> s3 --1--> s4(终止)
+奖励: 1, 1, 1, 1      折扣 γ = 0.9</code></pre>
+<p>假设网络当前的价值估计<strong>偏高</strong>：$V(s_0)=4.5,\ V(s_1)=4.0,\ V(s_2)=3.0,\ V(s_3)=2.0,\ V(s_4)=0$</p>
+<p><strong>真实回报</strong>（MC，从 s0 走到底）：$1 + 0.9 + 0.81 + 0.729 = 3.439$</p>
+<p>现在算从 $s_0$ 出发的各种 n 步回报：</p>
+<table>
+  <thead><tr><th>n</th><th>算式</th><th>结果</th><th>偏差</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>$1+0.9\times4.0$</td><td><strong>4.600</strong></td><td>+1.16</td></tr>
+    <tr><td>2</td><td>$1+0.9\times1+0.81\times3.0$</td><td><strong>4.330</strong></td><td>+0.89</td></tr>
+    <tr><td>3</td><td>$1+0.9+0.81+0.729\times2.0$</td><td><strong>4.168</strong></td><td>+0.73</td></tr>
+    <tr><td>4</td><td>$1+0.9+0.81+0.729$</td><td><strong>3.439</strong></td><td>0</td></tr>
+  </tbody>
+</table>
+<p><strong>看这一列</strong>：n 越大，偏差越小。因为 $V$ 进入的权重是 $\gamma^n$，n 越大它的影响越小。但 n 越大，方差也越大。这就是那个取舍。</p>
+
+<h3>8.3 λ 不是"选一个 n"，而是"全都要"</h3>
+<div class="math">$$G_t^{\lambda}=(1-\lambda)\Big[G_t^{(1)}+\lambda G_t^{(2)}+\lambda^2 G_t^{(3)}+\cdots\Big]$$</div>
+<table>
+  <thead><tr><th>n</th><th>权重</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>$1-\lambda$</td></tr>
+    <tr><td>2</td><td>$(1-\lambda)\lambda$</td></tr>
+    <tr><td>3</td><td>$(1-\lambda)\lambda^2$</td></tr>
+    <tr><td>4</td><td>$(1-\lambda)\lambda^3$</td></tr>
+    <tr><td>…</td><td>…</td></tr>
+  </tbody>
+</table>
+
+<h4>为什么权重长这样（最该讲清楚的地方）</h4>
+<p><strong>想象你在抛硬币决定"这次要往前推几步"</strong>：</p>
+<ul>
+  <li>第 1 步之后，以概率 $(1-\lambda)$ 停 → 你用 $G^{(1)}$</li>
+  <li>没停（概率 $\lambda$），再走一步，以 $(1-\lambda)$ 停 → 你用 $G^{(2)}$</li>
+  <li>又没停，概率 $\lambda^2$，再以 $(1-\lambda)$ 停 → 你用 $G^{(3)}$</li>
+  <li>…</li>
+</ul>
+<p>所以"停在 n 步"的概率正好是 $(1-\lambda)\lambda^{n-1}$。</p>
+<div class="callout">
+  <span class="label">λ 的物理含义</span>
+  <p><strong>λ 就是"每多走一步还继续走的概率"。</strong></p>
+  <p>λ = 0.9 → 每步有 90% 继续 → 平均走 $1/(1-0.9)=10$ 步<br>
+     λ = 0.95 → 平均 20 步<br>
+     λ = 0.5 → 平均 2 步<br>
+     λ = 0 → 只走 1 步（就是 TD(0)）</p>
+  <div class="math">$$\text{有效视野}=\frac{1}{1-\lambda}$$</div>
+  <p>而且这些权重加起来正好是 1（因为"最终一定会在某一步停下"），所以它是一个合法的加权平均。</p>
+</div>
+
+<h3>8.4 手算 λ = 0.5</h3>
+<p>这条轨迹只有 4 步，所以权重是：</p>
+<div class="math">$$(1-\lambda)=0.5,\quad (1-\lambda)\lambda=0.25,\quad (1-\lambda)\lambda^2=0.125,\quad \text{剩下的 }\lambda^3=0.125$$</div>
+<div class="math">$$\begin{aligned}
+G^\lambda &= 0.5\times 4.600 + 0.25\times 4.330 + 0.125\times 4.168 + 0.125\times 3.439\\
+&= 2.300 + 1.0825 + 0.521 + 0.4299\\
+&= \mathbf{4.333}
+\end{aligned}$$</div>
+<p>检查：λ=0 时是 4.600，λ=1 时是 3.439，λ=0.5 得 4.333 —— <strong>确实在中间</strong>。</p>
+
+<h3>8.5 代码里用的是递推写法</h3>
+<div class="math">$$\boxed{G_t=r_t+\gamma\Big[(1-\lambda)V(s_{t+1})+\lambda G_{t+1}\Big]},\qquad G_T=V(s_T)$$</div>
+<p><strong>从后往前算</strong>（λ=0.5）：</p>
+<pre><code>G₄ = V(s₄) = 0
+
+G₃ = 1 + 0.9×[0.5×0 + 0.5×0]              = 1.000
+G₂ = 1 + 0.9×[0.5×2.0 + 0.5×1.000]        = 1 + 0.9×1.5    = 2.350
+G₁ = 1 + 0.9×[0.5×3.0 + 0.5×2.350]        = 1 + 0.9×2.675  = 3.408
+G₀ = 1 + 0.9×[0.5×4.0 + 0.5×3.408]        = 1 + 0.9×3.704  = 4.333  ✓</code></pre>
+<p><strong>和上面加权平均算出的一模一样。</strong></p>
+<p>递推写法的读法：第 t 步的值 = 现在的奖励 + 打折后的［一小部分用"对下一步的价值估计"，一大部分用"继续往后算出来的值"］。λ 就是这两部分的比例。</p>
+
+<h3>8.6 一个关键恒等式</h3>
+<div class="math">$$\boxed{G_t^{\lambda}=V(s_t)+\sum_{k\ge t}(\gamma\lambda)^{k-t}\,\delta_k}$$</div>
+<p>其中 $\delta_k=r_k+\gamma V(s_{k+1})-V(s_k)$ 是 TD 误差。</p>
+<p class="read"><b>读法：</b>λ-回报 = 你现在的估计 + 未来所有 TD 误差的折扣和。</p>
+<p>用上面的数据验证：</p>
+<pre><code>δ₀ = 1 + 0.9×4.0 − 4.5 = +0.100
+δ₁ = 1 + 0.9×3.0 − 4.0 = −0.300
+δ₂ = 1 + 0.9×2.0 − 3.0 = −0.200
+δ₃ = 1 + 0       − 2.0 = −1.000
+
+Σ (0.45)ᵏ δₖ = 0.100 + 0.45×(−0.3) + 0.2025×(−0.2) + 0.0911×(−1.0)
+             = 0.100 − 0.135 − 0.0405 − 0.0911
+             = −0.1666
+
+V(s₀) + (−0.1666) = 4.5 − 0.1666 = 4.333  ✓</code></pre>
+<div class="callout blue">
+  <span class="label">这个恒等式是整件事的钥匙</span>
+  <p>它把"未来的总收益"翻译成了"现在的估计 + 未来误差的累积"。理解它，后面的资格迹就自然懂了。</p>
+</div>
+
+<h3>8.7 后向视角：资格迹 eligibility trace</h3>
+<h4>为什么需要它</h4>
+<p>前向视角要求你知道所有 $G^{(n)}$，也就是<strong>必须等整局结束</strong>才能更新。但 TD 的卖点就是"走一步就能学"。后向视角解决这个问题：<strong>边走边更新</strong>。</p>
+<h4>怎么做</h4>
+<p>维护一个"痕迹"向量 $E(s)$，每步：</p>
+<div class="math">$$E_t(s)=\gamma\lambda\,E_{t-1}(s)+\mathbf{1}\{s_t=s\},\qquad V(s)\leftarrow V(s)+\alpha\,\delta_t\,E_t(s)$$</div>
+<p class="read"><b>读法：</b>这一步的 TD 误差，按"这个状态最近被访问过多少"分摊给所有状态。越久远的访问，衰减得越多（衰减率就是 $\gamma\lambda$）。</p>
+<h4>走一遍这条轨迹（λ=0.5，$\gamma\lambda=0.45$）</h4>
+<table>
+  <thead><tr><th>时刻</th><th>访问</th><th>δ</th><th>E(s₀)</th><th>E(s₁)</th><th>E(s₂)</th><th>E(s₃)</th></tr></thead>
+  <tbody>
+    <tr><td>t=0</td><td>s₀</td><td>+0.10</td><td><strong>1.0000</strong></td><td>0</td><td>0</td><td>0</td></tr>
+    <tr><td>t=1</td><td>s₁</td><td>−0.30</td><td><strong>0.4500</strong></td><td><strong>1.0000</strong></td><td>0</td><td>0</td></tr>
+    <tr><td>t=2</td><td>s₂</td><td>−0.20</td><td><strong>0.2025</strong></td><td><strong>0.4500</strong></td><td><strong>1.0000</strong></td><td>0</td></tr>
+    <tr><td>t=3</td><td>s₃</td><td>−1.00</td><td><strong>0.0911</strong></td><td><strong>0.2025</strong></td><td><strong>0.4500</strong></td><td><strong>1.0000</strong></td></tr>
+  </tbody>
+</table>
+<p>每行都在做：所有 E 先乘 0.45（衰减），然后把当前状态置为 1。看 s₀ 这一列：1 → 0.45 → 0.2025 → 0.0911。</p>
+<p>于是 s₀ 在整个 episode 里收到的总更新是：</p>
+<div class="math">$$\alpha\big[0.10\times1+(-0.30)\times0.45+(-0.20)\times0.2025+(-1.00)\times0.0911\big]=\alpha\times(-0.1666)$$</div>
+<p><strong>这正好等于 $\alpha\,(G^\lambda_0-V(s_0))$</strong> —— 和前向视角完全一致。</p>
+
+<h3>8.8 两张图记住区别</h3>
+<pre><code>前向视角（等整局结束）
+  s0 的更新 ← 把未来所有的 δ，按 (γλ)^距离 拿回来
+              δ0 ─── δ1 ─── δ2 ─── δ3
+               ×1    ×.45   ×.2    ×.09
+
+后向视角（边走边更）
+  每个 δ 一产生，就把它按 (γλ)^距离 分给过去所有状态
+              δ0 → s0
+              δ1 → s1, s0
+              δ2 → s2, s1, s0
+              δ3 → s3, s2, s1, s0</code></pre>
+<p><strong>同一个衰减核 $(\gamma\lambda)^k$，一个从未来拉、一个往过去推。离线更新时两者数学等价。</strong></p>
+
+<h3>8.9 为什么这对世界模型重要</h3>
+<div class="callout warn">
+  <span class="label">λ 不是随便定的超参数</span>
+  <p><strong>λ 直接编码了"我有多信任这个世界模型"。</strong></p>
+  <p>模型差 → λ 调小 → 只看眼前几步，剩下的靠价值估计兑底<br>
+     模型好 → λ 调大 → 敢往前推演更远<br>
+     极端情况：MBPO 把 rollout 硬性截断到 1~15 步，本质就是"λ 很小"</p>
+  <p>所以看到一篇论文说 λ = 0.95，你其实知道了：<strong>作者认为自己的模型在前 20 步内是可信的。</strong></p>
+</div>
+
+<h3>8.10 一句话总结</h3>
+<ul>
+  <li><strong>n 步</strong> = 真的走 n 步，剩下靠估。</li>
+  <li><strong>λ</strong> = "每多走一步还继续走的概率"，把 n=1 到 n=∞ 的估计按几何权重混起来。</li>
+  <li><strong>递推式</strong> $G_t=r_t+\gamma[(1-\lambda)V+\lambda G_{t+1}]$ 是代码写法。</li>
+  <li><strong>资格迹</strong>是"不等整局结束"的等价实现：把每步的 TD 误差按 $(\gamma\lambda)^k$ 分给最近访问过的状态。</li>
+</ul>
+<!--/S-->
+
+<!--S:9|函数逼近与致命三角-->
+<h3>9.1 为什么必须函数逼近</h3>
+<p>表格法要求每个状态一个数。图像输入的状态空间是 $256^{1920\times1080\times3}$ 量级——不可能建表。</p>
+<p>所以用参数化函数 $\hat V(s;\mathbf{w})$ 或 $\hat Q(s,a;\mathbf{w})$。</p>
+
+<h3>9.2 半梯度更新</h3>
+<div class="math">$$\mathbf{w}\leftarrow\mathbf{w}+\alpha\,\delta_t\,\nabla_{\mathbf{w}}\hat V(s_t;\mathbf{w})$$</div>
+<p>注意<strong>没有</strong>对 $\hat V(s_{t+1};\mathbf{w})$ 求梯度。如果求了，叫"残差梯度"，理论上更正确但收敛更差、且不稳定。实践中一律用半梯度。</p>
+
+<h3>9.3 致命三角（deadly triad）</h3>
+<div class="def">
+  <div class="t">三个要素</div>
+  <p><strong>① 函数逼近</strong>（神经网络）<br>
+     <strong>② 自举</strong>（用估计更新估计）<br>
+     <strong>③ off-policy</strong>（数据来自别的策略）</p>
+  <p>三者同时存在时，值估计<strong>可能发散到无穷</strong>。这是有构造性反例的（Baird 的星形反例）。</p>
+</div>
+<ul>
+  <li><strong>函数逼近</strong>：一次更新会改变很多状态的估计，误差会"泛化"到没见过的状态。</li>
+  <li><strong>自举</strong>：误差进入目标，被 $\gamma$ 反复放大。</li>
+  <li><strong>off-policy</strong>：更新时用的状态分布和当前策略的分布不一致，更新的"权重"是错的。</li>
+</ul>
+
+<h3>9.4 工程上的对策</h3>
+<table>
+  <thead><tr><th>手段</th><th>针对哪个要素</th><th>怎么做</th></tr></thead>
+  <tbody>
+    <tr><td>目标网络</td><td>自举</td><td>用一份延迟更新的参数算目标：$\mathbf{w}^-\leftarrow\tau\mathbf{w}^-+(1-\tau)\mathbf{w}$</td></tr>
+    <tr><td>经验回放</td><td>off-policy 的相关性</td><td>打乱样本，破坏时序相关</td></tr>
+    <tr><td>Double Q</td><td>自举的 max 偏差</td><td>见第 12 节</td></tr>
+    <tr><td>梯度裁剪 / 奖励归一化</td><td>数值稳定性</td><td>限制更新幅度</td></tr>
+    <tr><td>分布化价值</td><td>表示能力</td><td>C51、QR-DQN</td></tr>
+  </tbody>
+</table>
+<!--/S-->
+
+<!--S:10|动态规划：已知模型时最优求解-->
+<h3>10.1 策略评估</h3>
+<div class="math">$$V_{k+1}(s)=\sum_a\pi(a|s)\left[R(s,a)+\gamma\sum_{s'}P(s'|s,a)V_k(s')\right]$$</div>
+<p>由压缩映射，$V_k\to V^\pi$。</p>
+
+<h3>10.2 策略迭代</h3>
+<pre><code>初始化 π
+repeat:
+    V ← 策略评估(π)            # 解 Bellman 期望方程
+    π' ← 贪心(V)               # π'(s) = argmax_a Q(s,a)
+    if π' == π: break
+    π ← π'</code></pre>
+<p>每轮策略严格改进或已最优，策略空间有限，故<strong>有限步收敛</strong>。</p>
+
+<h3>10.3 价值迭代</h3>
+<div class="math">$$V_{k+1}(s)=\max_a\left[R(s,a)+\gamma\sum_{s'}P(s'|s,a)V_k(s')\right]$$</div>
+<p>把"评估"和"改进"合并成一步。不需要显式策略，收敛后取贪心即可。</p>
+<div class="callout">
+  <span class="label">两者的关系</span>
+  <p><strong>策略迭代</strong> = 评估到底 + 改进一次（贵但步数少）。<br>
+     <strong>价值迭代</strong> = 只评估一步 + 改进一步（每步便宜但步数多）。</p>
+  <p>本质上都是 $\mathcal{T}$ 的不动点迭代，只是分解方式不同。</p>
+</div>
+
+<h3>10.4 复杂度</h3>
+<p>每次迭代 $O(|\mathcal{S}|^2|\mathcal{A}|)$（矩阵形式）或 $O(|\mathcal{S}||\mathcal{A}|)$（逐状态）。对大规模问题不可行——这就是为什么需要采样方法。</p>
+<!--/S-->
+<!--S:11|无模型控制：SARSA 与 Q-learning-->
+<h3>11.1 从评估到控制：必须探索</h3>
+<p>控制需要 $\arg\max_a Q(s,a)$，但如果你永远只走已知最好的动作，就永远学不到别的动作的值。</p>
+<div class="def">
+  <div class="t">ε-greedy</div>
+  <div class="math">$$\pi(a|s)=\begin{cases}1-\varepsilon+\dfrac{\varepsilon}{|\mathcal{A}|} & a=\arg\max_{a'}Q(s,a')\\[6pt] \dfrac{\varepsilon}{|\mathcal{A}|} & \text{其他}\end{cases}$$</div>
+</div>
+<p><strong>GLIE</strong>（Greedy in the Limit with Infinite Exploration）：$\varepsilon_k\to0$ 但 $\sum_k\varepsilon_k=\infty$（如 $\varepsilon_k=1/k$）。满足 GLIE 的 ε-greedy MC 控制收敛到 $Q^*$。</p>
+
+<h3>11.2 SARSA（on-policy）</h3>
+<div class="math">$$Q(s_t,a_t)\leftarrow Q(s_t,a_t)+\alpha\Big[r_t+\gamma\,Q(s_{t+1},a_{t+1})-Q(s_t,a_t)\Big]$$</div>
+<p>用到的五元组是 $(s_t,a_t,r_t,s_{t+1},a_{t+1})$，所以叫 SARSA。它学的是<strong>当前策略</strong>（含探索）的价值。</p>
+<p><strong>特点</strong>：会学到"考虑自己会犯错"的保守策略。在悬崖问题上，SARSA 会绕远路，Q-learning 会贴边走。</p>
+
+<h3>11.3 Q-learning（off-policy）</h3>
+<div class="math">$$Q(s_t,a_t)\leftarrow Q(s_t,a_t)+\alpha\Big[r_t+\gamma\max_{a'}Q(s_{t+1},a')-Q(s_t,a_t)\Big]$$</div>
+<p>目标里用 $\max$，所以学的是<strong>最优策略</strong>的价值，与行为策略无关。</p>
+<div class="def">
+  <div class="t">收敛条件（表格型）</div>
+  <p>Q-learning 以概率 1 收敛到 $Q^*$，若：① 每个 $(s,a)$ 被无限次访问；② 步长满足 Robbins–Monro。</p>
+</div>
+
+<h3>11.4 Expected SARSA</h3>
+<div class="math">$$Q(s_t,a_t)\leftarrow Q(s_t,a_t)+\alpha\Big[r_t+\gamma\sum_{a'}\pi(a'|s_{t+1})Q(s_{t+1},a')-Q(s_t,a_t)\Big]$$</div>
+<p>把采样得到的 $Q(s_{t+1},a_{t+1})$ 换成期望。方差比 SARSA 小，且可以通过设 $\pi$ 为贪心而变成 Q-learning。</p>
+
+<h3>11.5 on-policy 与 off-policy 的形式差异</h3>
+<p>off-policy 的正确性依赖<strong>重要性采样</strong>。对一条轨迹，重要性比是：</p>
+<div class="math">$$\rho_{t:T-1}=\prod_{k=t}^{T-1}\frac{\pi(a_k|s_k)}{\mu(a_k|s_k)}$$</div>
+<p>其中 $\mu$ 是行为策略，$\pi$ 是目标策略。off-policy MC 的更新为：</p>
+<div class="math">$$V(s)\leftarrow V(s)+\alpha\big(\rho_{t:T-1}G_t-V(s)\big)$$</div>
+<div class="callout warn">
+  <span class="label">重要性采样的方差灾难</span>
+  <p>连乘的 $\rho$ 方差随长度<strong>指数</strong>增长。所以 off-policy MC 在实践中几乎不可用。</p>
+  <p>Q-learning 绕开了这个问题：它不用重要性采样，而是用 $\max$ 直接做"贪婪化"。代价是引入了 max 偏差（下一节）。</p>
+</div>
+<!--/S-->
+
+<!--S:12|最大化偏差与 Double Q-->
+<h3>12.1 偏差从哪来</h3>
+<p>对任意随机变量，取最大值会让期望变大：</p>
+<div class="math">$$\mathbb{E}\Big[\max_a \hat Q(s,a)\Big]\ \ge\ \max_a\mathbb{E}\big[\hat Q(s,a)\big]$$</div>
+<p class="read"><b>读法：</b>"最大值"这个操作偏爱<strong>正向噪声</strong>。估计里噪声最大的那个动作，恰好最容易被选中当最大值。</p>
+
+<h3>12.2 一个具体例子</h3>
+<p>两个动作，真实价值都是 0，但估计有噪声 $\pm1$ 等概率：</p>
+<table>
+  <thead><tr><th>$\hat Q(a_1)$</th><th>$\hat Q(a_2)$</th><th>$\max$</th></tr></thead>
+  <tbody>
+    <tr><td>+1</td><td>+1</td><td>+1</td></tr>
+    <tr><td>+1</td><td>−1</td><td>+1</td></tr>
+    <tr><td>−1</td><td>+1</td><td>+1</td></tr>
+    <tr><td>−1</td><td>−1</td><td>−1</td></tr>
+  </tbody>
+</table>
+<p>真实期望是 0，但 $\mathbb{E}[\max]=+0.5$。<strong>系统性高估 0.5。</strong></p>
+
+<h3>12.3 Double Q-learning</h3>
+<p>维护两套估计，<strong>用一套选动作，用另一套评估</strong>：</p>
+<div class="math">$$Q_1(s,a)\leftarrow Q_1(s,a)+\alpha\Big[r_t+\gamma\,Q_2\big(s',\arg\max_{a'}Q_1(s',a')\big)-Q_1(s,a)\Big]$$</div>
+<p>（另一半时间对称地更新 $Q_2$。）因为"选"和"评"用了不同的噪声，正向偏差被抵消。</p>
+<p>DQN 里的 Double DQN 就是这个思想：</p>
+<div class="math">$$y=r_t+\gamma\,Q_{\theta^-}\Big(s',\arg\max_{a'}Q_\theta(s',a')\Big)$$</div>
+<p>用在线网络选动作，用目标网络评估。</p>
+<!--/S-->
+
+<!--S:13|策略梯度-->
+<h3>13.1 目标函数</h3>
+<div class="math">$$J(\theta)=\mathbb{E}_{\tau\sim\pi_\theta}\Big[G_0\Big]=\mathbb{E}_{s_0\sim\rho_0}\Big[V^{\pi_\theta}(s_0)\Big]$$</div>
+<p>直接对 $\theta$ 求梯度很麻烦，因为<strong>策略决定了数据分布</strong>。需要"对数导数技巧"。</p>
+
+<h3>13.2 策略梯度定理</h3>
+<div class="def">
+  <div class="t">定理</div>
+  <div class="math">$$\nabla_\theta J(\theta)=\mathbb{E}_{s\sim d^{\pi_\theta},\,a\sim\pi_\theta}\Big[\nabla_\theta\log\pi_\theta(a|s)\,Q^{\pi_\theta}(s,a)\Big]$$</div>
+  <p>其中 $d^{\pi}$ 是策略 $\pi$ 下的（折扣）状态分布。</p>
+</div>
+<p><strong>推导线索</strong>（REINFORCE 版本）：</p>
+<div class="math">$$\nabla_\theta p_\theta(\tau)=p_\theta(\tau)\nabla_\theta\log p_\theta(\tau),\qquad
+\log p_\theta(\tau)=\log\rho_0(s_0)+\sum_t\big[\log\pi_\theta(a_t|s_t)+\log P(s_{t+1}|s_t,a_t)\big]$$</div>
+<p>环境项 $\log P$ 与 $\theta$ 无关，求导后消失。剩下：</p>
+<div class="math">$$\nabla_\theta J=\mathbb{E}_\tau\Big[\Big(\sum_t\nabla_\theta\log\pi_\theta(a_t|s_t)\Big)G_0\Big]
+=\mathbb{E}\Big[\sum_t\nabla_\theta\log\pi_\theta(a_t|s_t)\,G_t\Big]$$</div>
+<p>最后一步用了"$t$ 之前的奖励与 $a_t$ 无关，可以从期望里去掉"。</p>
+
+<h3>13.3 REINFORCE</h3>
+<div class="math">$$\theta\leftarrow\theta+\alpha\,\gamma^{t}\,G_t\,\nabla_\theta\log\pi_\theta(a_t|s_t)$$</div>
+<p class="read"><b>读法：</b>如果这一局总回报高，就把这条轨迹里每个动作的概率往上推；如果低，就压低。$G_t$ 是权重。</p>
+<div class="callout bad">
+  <span class="label">REINFORCE 的问题：方差极大</span>
+  <p>因为 $G_t$ 是 MC 估计，方差随回合长度增长。而且它对<strong>所有动作</strong>用同一个 $G_t$——即使某个动作其实很糟，只要整局运气好，它也会被强化。</p>
+</div>
+
+<h3>13.4 方差缩减三件套</h3>
+<h4>① Baseline</h4>
+<p>减去一个只依赖状态的基线 $b(s)$，期望不变：</p>
+<div class="math">$$\mathbb{E}_{a\sim\pi}\big[\nabla_\theta\log\pi_\theta(a|s)\,b(s)\big]
+=b(s)\sum_a\nabla_\theta\pi_\theta(a|s)=b(s)\nabla_\theta\underbrace{\sum_a\pi_\theta(a|s)}_{=1}=0$$</div>
+<p>取 $b(s)=V^\pi(s)$ 时方差最小（近似）。</p>
+
+<h4>② 优势函数</h4>
+<div class="math">$$\nabla_\theta J=\mathbb{E}\Big[\nabla_\theta\log\pi_\theta(a|s)\,A^{\pi_\theta}(s,a)\Big]$$</div>
+<p>用 $A=Q-V$ 替代 $Q$。含义变成"这个动作比<strong>平均水平</strong>好多少"，而不是"这一步总共值多少"。</p>
+
+<h4>③ GAE（广义优势估计）</h4>
+<div class="math">$$\delta_t=r_t+\gamma V(s_{t+1})-V(s_t),\qquad \hat A_t^{\mathrm{GAE}(\gamma,\lambda)}=\sum_{l=0}^{\infty}(\gamma\lambda)^{l}\,\delta_{t+l}$$</div>
+<p>这是 λ-回报在优势上的版本。$\lambda=0$ 退化为单步 TD 优势（方差小、偏差大），$\lambda=1$ 退化为 MC 优势。</p>
+<div class="callout blue">
+  <span class="label">注意：同一个 λ，两个地方出现</span>
+  <p>第 8 节的 λ（值函数目标）和第 13 节的 λ（优势估计）是<strong>同一个思想</strong>：在"信估计"和"信实际采样"之间插值。</p>
+</div>
+<!--/S-->
+
+<!--S:14|Actor-Critic 与现代算法-->
+<h3>14.1 基本结构</h3>
+<div class="grid2">
+  <div class="box">
+    <h4>Actor $\pi_\theta(a|s)$</h4>
+    <p class="small">负责"做"。用策略梯度更新。</p>
+  </div>
+  <div class="box">
+    <h4>Critic $V_\phi(s)$ 或 $Q_\phi(s,a)$</h4>
+    <p class="small">负责"评"。用 TD 更新。</p>
+  </div>
+</div>
+<div class="math">$$\theta\leftarrow\theta+\alpha_\theta\,\hat A(s,a)\,\nabla_\theta\log\pi_\theta(a|s)$$</div>
+<div class="math">$$\phi\leftarrow\phi-\alpha_\phi\,\nabla_\phi\frac{1}{2}\Big(r_t+\gamma V_\phi(s_{t+1})-V_\phi(s_t)\Big)^2$$</div>
+<p class="read"><b>读法：</b>critic 用 TD 给出低方差的"优势"，actor 用这个优势当权重去调动作概率。</p>
+
+<h3>14.2 A2C / A3C</h3>
+<p><strong>A2C</strong>（Advantage Actor-Critic）：同步版本，多个环境并行采样，拼成一个 batch 更新。</p>
+<p><strong>A3C</strong>：异步版本，多个 worker 各自和环境交互，异步更新全局参数。工程上现在基本被 A2C/PPO 取代（异步带来的梯度陈旧问题很难调）。</p>
+
+<h3>14.3 TRPO：信赖域</h3>
+<div class="math">$$\max_\theta\ \mathbb{E}\left[\frac{\pi_\theta(a|s)}{\pi_{\theta_{\text{old}}}(a|s)}A^{\pi_{\theta_{\text{old}}}}(s,a)\right]
+\quad\text{s.t.}\quad
+\mathbb{E}\big[D_{KL}\big(\pi_{\theta_{\text{old}}}\,\|\,\pi_\theta\big)\big]\le\delta$$</div>
+<p><strong>动机</strong>：策略梯度是"一阶"的，步长稍大就会让策略崩溃（数据分布随之改变，旧的优势估计失效）。TRPO 用 KL 约束把每步限制在一个"可信"的范围内。</p>
+<p><strong>实现</strong>：用共轭梯度 + 线搜索求解，比较复杂。</p>
+
+<h3>14.4 PPO：把约束变成裁剪</h3>
+<div class="math">$$r_t(\theta)=\frac{\pi_\theta(a_t|s_t)}{\pi_{\theta_{\text{old}}}(a_t|s_t)}$$</div>
+<div class="math">$$L^{\mathrm{CLIP}}(\theta)=\mathbb{E}_t\Big[\min\big(r_t(\theta)\hat A_t,\ \operatorname{clip}(r_t(\theta),1-\epsilon,1+\epsilon)\hat A_t\big)\Big]$$</div>
+<p class="read"><b>读法：</b>如果优势为正，就提高这个动作的概率，但最多只允许提高 $(1+\epsilon)$ 倍；如果为负，就压低，最多压低到 $(1-\epsilon)$ 倍。超出部分梯度为零。</p>
+<p><strong>完整损失</strong>（通常三项相加）：</p>
+<div class="math">$$L=-L^{\mathrm{CLIP}}+c_1\,\mathbb{E}\big[(V_\phi(s_t)-\hat R_t)^2\big]-c_2\,\mathbb{E}\big[\mathcal{H}(\pi_\theta(\cdot|s_t))\big]$$</div>
+<p>分别是策略损失、价值损失、熵奖励（鼓励探索）。</p>
+<div class="callout">
+  <span class="label">为什么 PPO 成了默认选择</span>
+  <p>TRPO 的约束是"硬"的（要解约束优化），PPO 用裁剪把它变成"软"的（一次梯度下降就行）。效果接近，实现简单一个数量级。</p>
+</div>
+
+<h3>14.5 DDPG / TD3：确定性策略 + 连续动作</h3>
+<p>对连续动作，$\max_a Q(s,a)$ 无法枚举。改为学一个确定性策略 $\mu_\theta(s)$，用<strong>确定性策略梯度</strong>：</p>
+<div class="math">$$\nabla_\theta J=\mathbb{E}_{s}\Big[\nabla_a Q_\phi(s,a)\big|_{a=\mu_\theta(s)}\,\nabla_\theta\mu_\theta(s)\Big]$$</div>
+<p class="read"><b>读法：</b>先问 critic"动作往哪个方向改能让 Q 变大"（$\nabla_a Q$），再把这个方向通过链式法则传回策略参数。</p>
+<p><strong>TD3 的三个修正</strong>：① 双 critic 取较小值（抑制高估）；② 目标策略加噪声平滑；③ 延迟更新 actor。</p>
+
+<h3>14.6 SAC：最大熵强化学习</h3>
+<div class="math">$$J(\pi)=\mathbb{E}_{\tau\sim\pi}\left[\sum_{t}\gamma^{t}\Big(r_t+\alpha\,\mathcal{H}\big(\pi(\cdot|s_t)\big)\Big)\right]$$</div>
+<p><strong>软 Bellman 方程</strong>：</p>
+<div class="math">$$Q(s,a)=r+\gamma\,\mathbb{E}_{s'}\Big[V(s')\Big],\qquad
+V(s)=\mathbb{E}_{a\sim\pi}\big[Q(s,a)-\alpha\log\pi(a|s)\big]$$</div>
+<p><strong>策略改进</strong>（投影到当前策略族）：</p>
+<div class="math">$$\pi_{\text{new}}=\arg\min_{\pi'\in\Pi}D_{KL}\left(\pi'(\cdot|s)\ \Big\|\ \frac{\exp\big(Q(s,\cdot)/\alpha\big)}{Z(s)}\right)$$</div>
+<div class="callout blue">
+  <span class="label">熵项到底做了什么</span>
+  <p>它让策略<strong>在多个同样好的动作之间保持分散</strong>。这直接解决了"多解塌缩"问题（同一个场景左绕右绕都行，硬选一个会在训练中抖）。</p>
+  <p>同时也是一种探索：熵高 = 不会过早收敛到局部最优。</p>
+</div>
+
+<h3>14.7 算法谱系</h3>
+<table>
+  <thead><tr><th>算法</th><th>策略类型</th><th>动作空间</th><th>on/off</th><th>核心机制</th></tr></thead>
+  <tbody>
+    <tr><td>REINFORCE</td><td>随机</td><td>离散/连续</td><td>on</td><td>MC 策略梯度</td></tr>
+    <tr><td>A2C / A3C</td><td>随机</td><td>都行</td><td>on</td><td>优势函数 + critic</td></tr>
+    <tr><td>TRPO</td><td>随机</td><td>都行</td><td>on</td><td>KL 约束</td></tr>
+    <tr><td>PPO</td><td>随机</td><td>都行</td><td>on</td><td>概率比裁剪</td></tr>
+    <tr><td>DDPG</td><td>确定性</td><td>连续</td><td>off</td><td>确定性策略梯度</td></tr>
+    <tr><td>TD3</td><td>确定性</td><td>连续</td><td>off</td><td>双 Q + 目标平滑</td></tr>
+    <tr><td>SAC</td><td>随机</td><td>连续</td><td>off</td><td>最大熵 + 双 Q</td></tr>
+  </tbody>
+</table>
+<!--/S-->
+
+<!--S:15|探索与遗憾-->
+<h3>15.1 遗憾</h3>
+<div class="math">$$R_T=T\mu^{*}-\mathbb{E}\left[\sum_{t=1}^{T}\mu_{a_t}\right]$$</div>
+<p class="read"><b>读法：</b>如果一开始就知道最优动作，$T$ 步能拿多少，减去实际拿了多少。差距就是"探索的学费"。</p>
+<p>好的算法让遗憾<strong>亚线性</strong>增长（$R_T/T\to0$），即"平均每步的损失趋于零"。</p>
+
+<h3>15.2 三种经典策略（多臂老虎机）</h3>
+<h4>ε-greedy</h4>
+<p>以 $\varepsilon$ 概率随机。遗憾线性增长：$R_T=O(\varepsilon T)$。<strong>永远学不完</strong>。</p>
+<h4>UCB</h4>
+<div class="math">$$a_t=\arg\max_{a}\left[\hat\mu_a+c\sqrt{\frac{\ln t}{N_a(t)}}\right]$$</div>
+<p>遗憾 $O(\sqrt{KT\ln T})$。直觉：<strong>乐观面对不确定性</strong>——没试过的动作，先假设它很好。</p>
+<h4>Thompson 采样</h4>
+<p>维护每个动作的后验 $p(\mu_a\mid\mathcal{D})$，每步从后验采样一组参数，选当前最优。遗憾接近理论下界 $O(\sqrt{KT\ln T})$。</p>
+
+<h3>15.3 深度 RL 的探索：内在奖励</h3>
+<table>
+  <thead><tr><th>方法</th><th>奖励信号</th><th>直觉</th></tr></thead>
+  <tbody>
+    <tr><td>Count-based</td><td>$r^{+}=\beta/\sqrt{N(s)}$</td><td>去得越少，奖励越大</td></tr>
+    <tr><td>ICM（好奇心）</td><td>$r^{+}=\|\hat\phi(s_{t+1})-\phi(s_{t+1})\|^2$</td><td>预测误差 = 新奇</td></tr>
+    <tr><td>RND（随机网络蒸馏）</td><td>$r^{+}=\|f_{\text{target}}(s)-f_{\text{pred}}(s)\|^2$</td><td>只在新状态上误差大</td></tr>
+    <tr><td>Plan2Explore</td><td>$r^{+}=\operatorname{Var}_{\text{ensemble}}\big[\hat s_{t+1}\big]$</td><td>主动去找模型分歧大的地方</td></tr>
+  </tbody>
+</table>
+<div class="callout warn">
+  <span class="label">内在奖励的经典失败模式：Noisy TV</span>
+  <p>如果环境里有随机噪声源（比如雪花屏），预测误差永远很大，智能体会<strong>盯着噪声看</strong>而不去探索真正有用的地方。</p>
+  <p>这说明"用预测误差定义新奇"是有前提的：必须能区分<strong>偶然不确定性</strong>（噪声，不可学）和<strong>认知不确定性</strong>（没见过，可学）。</p>
+</div>
+
+<h3>15.4 离线 RL 的探索问题</h3>
+<p>离线 RL 不能探索，只能从固定数据集学。核心困难是<strong>分布外动作的价值被高估</strong>：</p>
+<div class="math">$$\max_a Q(s,a)\ \text{可能选中一个数据里从未出现、但被网络外推得很高的动作}$$</div>
+<p>对策是"悲观"：对不确定的动作打折扣（CQL、MOPO、MOReL）。</p>
+<!--/S-->
+<!--S:16|基于模型：Dyna 与规划-->
+<h3>16.1 Dyna</h3>
+<pre><code>每步：
+  1. 真实环境执行 a，得到 (r, s')
+  2. 用这条经验更新 Q（真实更新）
+  3. 把 (s,a,r,s') 存进模型 M
+  4. 重复 n 次：
+       从 M 采样一个 (s,a) → (r̂, ŝ')
+       用 (r̂, ŝ') 更新 Q（模拟更新）</code></pre>
+<p>模型 $M:(s,a)\mapsto(\hat r,\hat s')$ 可以是表格、高斯过程、神经网络、或一个视频生成模型。</p>
+
+<h3>16.2 学习模型</h3>
+<div class="math">$$\mathcal{L}(\theta)=\mathbb{E}_{(s,a,r,s')\sim\mathcal{D}}\Big[\big\|\hat s'_\theta(s,a)-s'\big\|^2+\big(\hat r_\theta(s,a)-r\big)^2\Big]$$</div>
+<p>注意：<strong>模型的训练目标和最终目标（策略表现）不一致</strong>。这就是"目标错配"。缓解办法是只对决策相关的量加权（value-aware model learning）。</p>
+
+<h3>16.3 MPC + CEM / MPPI</h3>
+<div class="math">$$a^{*}_{t:t+H-1}=\arg\max_{a_{t:t+H-1}}\ \mathbb{E}\left[\sum_{k=0}^{H-1}\gamma^{k}\hat r(s_{t+k},a_{t+k})\right]$$</div>
+<p><strong>CEM</strong>：采样 $N$ 条序列 → 取回报最高的 $M$ 条（elite）→ 用它们重新拟合采样分布 → 重复若干次。</p>
+<p><strong>MPPI</strong>：不做"硬截断"，而是按回报做<strong>软加权</strong>：</p>
+<div class="math">$$w_i=\frac{\exp\big(S_i/\kappa\big)}{\sum_j\exp\big(S_j/\kappa\big)},\qquad a^{\text{new}}=\sum_i w_i\,a^{(i)}$$</div>
+
+<h3>16.4 为什么模型误差会毁掉规划</h3>
+<p>规划器是模型的<strong>对抗性消费者</strong>：它在动作空间里搜索"模型预测回报最高"的序列，因此一定会找到模型的乐观错误。</p>
+<div class="math">$$\text{规划}=\arg\max_a\ \hat Q(s,a)\ \Longrightarrow\ \text{系统性选中 }\hat Q\text{ 高估的地方}$$</div>
+<p>对策：短视野 + 频繁重规划、集成模型的不确定性惩罚、保守约束。</p>
+<!--/S-->
+
+<!--S:17|MCTS 与 MuZero-->
+<h3>17.1 UCT</h3>
+<div class="math">$$a^{*}=\arg\max_a\left[Q(s,a)+c\sqrt{\frac{\ln N(s)}{N(s,a)}}\right]$$</div>
+<p>第一项利用，第二项探索。$N(s,a)\to0$ 时第二项发散，保证每个动作至少被试一次。</p>
+
+<h3>17.2 四步循环</h3>
+<ol>
+  <li><strong>选择</strong>：按 UCT 从根走到叶子。</li>
+  <li><strong>扩展</strong>：在叶子加一个子节点。</li>
+  <li><strong>模拟/评估</strong>：用策略网络+价值网络估一个值（AlphaZero 不用随机 rollout）。</li>
+  <li><strong>回传</strong>：沿路径更新 $N$ 和 $Q$。</li>
+</ol>
+
+<h3>17.3 PUCT（AlphaZero）</h3>
+<div class="math">$$a^{*}=\arg\max_a\left[Q(s,a)+c_{\text{puct}}\,P(s,a)\,\frac{\sqrt{N(s)}}{1+N(s,a)}\right]$$</div>
+<p>$P(s,a)$ 是策略网络给的先验。有先验时搜索更有方向，不需要靠随机试错找到好分支。</p>
+
+<h3>17.4 MuZero</h3>
+<p>不假设已知环境规则，而是学三个函数：</p>
+<div class="math">$$\begin{aligned}
+h_\theta&:\ o_{0:t}\ \mapsto\ s_0 &&\text{(表示)}\\
+g_\theta&:\ (s_k,a_k)\ \mapsto\ (s_{k+1},\,r_k) &&\text{(动力学)}\\
+f_\theta&:\ s_k\ \mapsto\ (p_k,\,v_k) &&\text{(预测)}
+\end{aligned}$$</div>
+<p>搜索在隐空间进行，然后用搜索结果训练网络：</p>
+<div class="math">$$\mathcal{L}=\sum_{k=0}^{K}\Big[
+\underbrace{(r_k-\hat r_k)^2}_{\text{奖励}}+
+\underbrace{(v_k-\hat v_k)^2}_{\text{价值}}+
+\underbrace{\Big(-\sum_a \pi_k(a)\log p_k(a)\Big)}_{\text{策略交叉熵}}\Big]$$</div>
+<div class="callout blue">
+  <span class="label">价值等价（value equivalence）</span>
+  <p>MuZero 不要求 $s_k$ 能还原观测，只要求它对<strong>预测奖励、价值、策略</strong>是充分的。</p>
+  <p>两个模型若对所有策略给出相同的值与奖励序列，则等价——哪怕一个能渲染画面、另一个不能。</p>
+</div>
+<!--/S-->
+
+<!--S:18|Dreamer：在隐空间想象-->
+<h3>18.1 RSSM</h3>
+<div class="math">$$\begin{aligned}
+h_t&=f_\theta(h_{t-1},z_{t-1},a_{t-1}) &&\text{(确定性记忆)}\\
+z_t&\sim q_\theta(z_t\mid h_t,o_t) &&\text{(后验，看到观测)}\\
+z_t&\sim p_\theta(z_t\mid h_t) &&\text{(先验，想象时用)}
+\end{aligned}$$</div>
+
+<h3>18.2 损失</h3>
+<div class="math">$$\mathcal{L}=\underbrace{\mathbb{E}\big[-\log p(o_t\mid h_t,z_t)\big]}_{\text{重建}}+
+\underbrace{(r_t-\hat r_t)^2}_{\text{奖励}}+
+\underbrace{\mathrm{BCE}(c_t,\hat c_t)}_{\text{继续概率}}+
+\underbrace{\beta\,D_{KL}\big[q(z_t|h_t,o_t)\,\|\,p(z_t|h_t)\big]}_{\text{让先验能替代后验}}$$</div>
+<p>最后一项是关键：训练时用后验（有观测），想象时只能用先验。KL 项强迫两者接近。</p>
+
+<h3>18.3 想象训练</h3>
+<div class="math">$$\hat G_t=\hat r_t+\gamma\Big[(1-\lambda)\hat V(z_{t+1})+\lambda\hat G_{t+1}\Big]$$</div>
+<p>actor 和 critic 都在这条想象轨迹上更新，完全不碰真实环境。</p>
+<div class="callout warn">
+  <span class="label">想象训练的边界</span>
+  <p>想象长度 $H$ 和 $\lambda$ 决定了"信任模型多远"。模型误差随 $H$ 累积，所以 Dreamer 默认 $H=15$、$\lambda=0.95$。</p>
+</div>
+<!--/S-->
+
+<!--S:19|四条轴与算法总表-->
+<h3>19.1 轴一：有没有模型</h3>
+<table>
+  <thead><tr><th></th><th>model-free</th><th>model-based</th></tr></thead>
+  <tbody>
+    <tr><td>学什么</td><td>直接学 $V,Q,\pi$</td><td>先学 $P,R$，再规划</td></tr>
+    <tr><td>样本效率</td><td>低</td><td>高</td></tr>
+    <tr><td>风险</td><td>无模型误差</td><td>模型误差进入策略</td></tr>
+    <tr><td>代表</td><td>DQN、PPO、SAC</td><td>Dreamer、MuZero、TD-MPC</td></tr>
+  </tbody>
+</table>
+
+<h3>19.2 轴二：采样 × 自举</h3>
+<table>
+  <thead><tr><th></th><th>不自举（用到终局）</th><th>自举（一步 + 估计）</th></tr></thead>
+  <tbody>
+    <tr><td><strong>有完整模型</strong></td><td>穷举搜索</td><td>动态规划</td></tr>
+    <tr><td><strong>无模型</strong></td><td>蒙特卡洛</td><td>时序差分</td></tr>
+  </tbody>
+</table>
+
+<h3>19.3 轴三：学什么</h3>
+<table>
+  <thead><tr><th>类型</th><th>学</th><th>更新</th><th>优点</th><th>缺点</th></tr></thead>
+  <tbody>
+    <tr><td>value-based</td><td>$Q$</td><td>TD + argmax</td><td>稳、样本效率高</td><td>只能离散动作、确定性</td></tr>
+    <tr><td>policy-based</td><td>$\pi$</td><td>策略梯度</td><td>连续动作、随机策略</td><td>方差大</td></tr>
+    <tr><td>actor-critic</td><td>$\pi+V$</td><td>优势加权梯度</td><td>两者兼得</td><td>要调两个网络</td></tr>
+  </tbody>
+</table>
+
+<h3>19.4 轴四：on / off-policy</h3>
+<table>
+  <thead><tr><th></th><th>on-policy</th><th>off-policy</th></tr></thead>
+  <tbody>
+    <tr><td>数据来源</td><td>当前策略</td><td>任意策略（含人类）</td></tr>
+    <tr><td>能否回放</td><td>弱</td><td>强</td></tr>
+    <tr><td>稳定性</td><td>好</td><td>可能发散</td></tr>
+    <tr><td>代表</td><td>PPO、A2C</td><td>DQN、SAC、Dreamer</td></tr>
+  </tbody>
+</table>
+
+<h3>19.5 算法总表</h3>
+<table>
+  <thead><tr><th>算法</th><th>要模型</th><th>自举</th><th>学什么</th><th>on/off</th><th>动作</th></tr></thead>
+  <tbody>
+    <tr><td>策略迭代 / 价值迭代</td><td>是（已知）</td><td>是</td><td>$V$</td><td>—</td><td>离散</td></tr>
+    <tr><td>MC 控制</td><td>否</td><td>否</td><td>$Q$</td><td>on</td><td>离散</td></tr>
+    <tr><td>SARSA</td><td>否</td><td>是</td><td>$Q$</td><td>on</td><td>离散</td></tr>
+    <tr><td>Q-learning</td><td>否</td><td>是</td><td>$Q$</td><td>off</td><td>离散</td></tr>
+    <tr><td>DQN / Double DQN</td><td>否</td><td>是</td><td>$Q$（网络）</td><td>off</td><td>离散</td></tr>
+    <tr><td>REINFORCE</td><td>否</td><td>否</td><td>$\pi$</td><td>on</td><td>都行</td></tr>
+    <tr><td>A2C / PPO</td><td>否</td><td>是</td><td>$\pi+V$</td><td>on</td><td>都行</td></tr>
+    <tr><td>DDPG / TD3</td><td>否</td><td>是</td><td>$\mu+Q$</td><td>off</td><td>连续</td></tr>
+    <tr><td>SAC</td><td>否</td><td>是</td><td>$\pi+Q$</td><td>off</td><td>连续</td></tr>
+    <tr><td>Dyna</td><td>是（学的）</td><td>是</td><td>$Q$</td><td>off</td><td>离散</td></tr>
+    <tr><td>MCTS + UCT</td><td>是（已知）</td><td>否</td><td>搜索</td><td>—</td><td>离散</td></tr>
+    <tr><td>AlphaZero</td><td>是（已知规则）</td><td>是</td><td>$\pi+V$</td><td>on</td><td>离散</td></tr>
+    <tr><td>MuZero</td><td>是（学的）</td><td>是</td><td>$\pi+V$</td><td>off</td><td>离散</td></tr>
+    <tr><td>Dreamer</td><td>是（学的）</td><td>是</td><td>$\pi+V$</td><td>off</td><td>都行</td></tr>
+  </tbody>
+</table>
+<!--/S-->
+
+<!--S:20|五个根本难题-->
+<p>所有算法都在解这五个问题中的某些。看懂这五个，比记住算法名有用得多。</p>
+<h3>20.1 探索与利用</h3>
+<p>只有试了才知道好不好，但试要付代价。量化指标是遗憾。<strong>核心张力</strong>：短期收益 vs 信息获取。</p>
+<h3>20.2 信用分配</h3>
+<p>结果延迟出现时，功劳/责任如何分配给历史动作。<strong>技术体现</strong>：MC（平均分）↔ TD（怪上一步）↔ λ（按距离衰减）。</p>
+<h3>20.3 稀疏奖励与奖励设计</h3>
+<p>只在终点给分时，梯度信号几乎为零；而设计密集奖励又会被钻空子（Goodhart's law）。<strong>技术体现</strong>：reward shaping、内在奖励、课程学习、模仿学习初始化。</p>
+<h3>20.4 分布偏移</h3>
+<p>训练分布 ≠ 部署分布，且误差是复利式的。<strong>技术体现</strong>：DAgger、重要性采样、离线 RL 的悲观约束、闭环评测。</p>
+<h3>20.5 致命三角</h3>
+<p>函数逼近 × 自举 × off-policy → 可能发散。<strong>技术体现</strong>：目标网络、经验回放、双 Q、梯度裁剪。</p>
+<div class="callout">
+  <span class="label">一张图记住</span>
+  <p><strong>探索</strong>决定"数据从哪来"，<strong>信用分配</strong>决定"学到的东西对不对"，<strong>稀疏奖励</strong>决定"有没有信号"，<strong>分布偏移</strong>决定"学到的东西能不能用"，<strong>致命三角</strong>决定"训练会不会崩"。</p>
+</div>
+<!--/S-->
+
+<!--S:21|实务必踩的坑-->
+<table>
+  <thead><tr><th>现象</th><th>可能原因</th><th>对策</th></tr></thead>
+  <tbody>
+    <tr><td>Q 值爆炸</td><td>自举放大误差、奖励尺度太大</td><td>目标网络、奖励归一化、梯度裁剪、Double Q</td></tr>
+    <tr><td>策略过早收敛到单一动作</td><td>熵塌缩、探索不足</td><td>熵奖励、ε 探索、策略标准差下限</td></tr>
+    <tr><td>训练好评测崩</td><td>分布偏移</td><td>闭环评测、DAgger、领域随机化</td></tr>
+    <tr><td>价值学得很准但策略很差</td><td>目标错配</td><td>用优势而非绝对价值、价值等价目标</td></tr>
+    <tr><td>不同随机种子结果差异巨大</td><td>方差大、初始化敏感</td><td>多种子报告、降低学习率、增加 batch</td></tr>
+    <tr><td>PPO 更新后策略崩掉</td><td>KL 太大、ratio 截断失效</td><td>监控 KL、自适应学习率、限制 epoch</td></tr>
+    <tr><td>离线 RL 学到"幻觉动作"</td><td>OOD 动作被高估</td><td>悲观惩罚（CQL）、策略约束、只信数据支撑区</td></tr>
+  </tbody>
+</table>
+<div class="callout warn">
+  <span class="label">一条最重要的实践原则</span>
+  <p><strong>先让评测可信，再谈算法。</strong>一个不可信的评测会让你在错误的算法上迭代几个月。</p>
+  <p>对安全关键系统，开环指标几乎必定是乐观的——必须做闭环。</p>
+</div>
+<!--/S-->
+
+<!--S:A|附录 A · 公式卡-->
+<table>
+  <thead><tr><th>名称</th><th>公式</th></tr></thead>
+  <tbody>
+    <tr><td>回报</td><td>$G_t=\sum_{k\ge0}\gamma^k r_{t+k},\quad G_t=r_t+\gamma G_{t+1}$</td></tr>
+    <tr><td>状态价值</td><td>$V^\pi(s)=\mathbb{E}_\pi[G_t\mid s_t=s]$</td></tr>
+    <tr><td>优势</td><td>$A^\pi(s,a)=Q^\pi(s,a)-V^\pi(s)$</td></tr>
+    <tr><td>Bellman 期望</td><td>$V^\pi(s)=\sum_a\pi(a|s)\big[R(s,a)+\gamma\sum_{s'}P(s'|s,a)V^\pi(s')\big]$</td></tr>
+    <tr><td>Bellman 最优</td><td>$V^*(s)=\max_a\big[R(s,a)+\gamma\sum_{s'}P(s'|s,a)V^*(s')\big]$</td></tr>
+    <tr><td>压缩性</td><td>$\|\mathcal{T}V_1-\mathcal{T}V_2\|_\infty\le\gamma\|V_1-V_2\|_\infty$</td></tr>
+    <tr><td>TD 误差</td><td>$\delta_t=r_t+\gamma V(s_{t+1})-V(s_t)$</td></tr>
+    <tr><td>Q-learning</td><td>$Q(s,a)\leftarrow Q(s,a)+\alpha\big[r+\gamma\max_{a'}Q(s',a')-Q(s,a)\big]$</td></tr>
+    <tr><td>SARSA</td><td>$Q(s,a)\leftarrow Q(s,a)+\alpha\big[r+\gamma Q(s',a')-Q(s,a)\big]$</td></tr>
+    <tr><td>n 步回报</td><td>$G_t^{(n)}=\sum_{k=0}^{n-1}\gamma^kr_{t+k}+\gamma^nV(s_{t+n})$</td></tr>
+    <tr><td>λ-回报</td><td>$G_t^\lambda=(1-\lambda)\sum_{n\ge1}\lambda^{n-1}G_t^{(n)}$</td></tr>
+    <tr><td>λ 递推</td><td>$G_t=r_t+\gamma[(1-\lambda)V(s_{t+1})+\lambda G_{t+1}]$</td></tr>
+    <tr><td>λ 恒等式</td><td>$G_t^\lambda=V(s_t)+\sum_{k\ge t}(\gamma\lambda)^{k-t}\delta_k$</td></tr>
+    <tr><td>迹</td><td>$E_t(s)=\gamma\lambda E_{t-1}(s)+\mathbf{1}\{s_t=s\}$</td></tr>
+    <tr><td>策略梯度</td><td>$\nabla_\theta J=\mathbb{E}\big[\nabla_\theta\log\pi_\theta(a|s)\,Q^{\pi_\theta}(s,a)\big]$</td></tr>
+    <tr><td>GAE</td><td>$\hat A_t=\sum_{l\ge0}(\gamma\lambda)^l\delta_{t+l}$</td></tr>
+    <tr><td>PPO</td><td>$L=\mathbb{E}\big[\min(r_t\hat A_t,\operatorname{clip}(r_t,1-\epsilon,1+\epsilon)\hat A_t)\big]$</td></tr>
+    <tr><td>SAC 目标</td><td>$J=\mathbb{E}\Big[\sum_t\gamma^t\big(r_t+\alpha\mathcal{H}(\pi(\cdot|s_t))\big)\Big]$</td></tr>
+    <tr><td>UCB</td><td>$a_t=\arg\max_a\big[\hat\mu_a+c\sqrt{\ln t/N_a}\big]$</td></tr>
+    <tr><td>PUCT</td><td>$a^*=\arg\max_a\big[Q(s,a)+cP(s,a)\tfrac{\sqrt{N(s)}}{1+N(s,a)}\big]$</td></tr>
+    <tr><td>KL</td><td>$D_{KL}(p\|q)=\sum_x p(x)\log\frac{p(x)}{q(x)}\ge0$</td></tr>
+    <tr><td>熵</td><td>$\mathcal{H}(\pi)=-\sum_a\pi(a)\log\pi(a)$</td></tr>
+  </tbody>
+</table>
+<!--/S-->
+
+<!--S:B|附录 B · 数学准备-->
+<h3>B.1 偏差-方差分解</h3>
+<div class="math">$$\mathbb{E}\big[(\hat\theta-\theta)^2\big]=\underbrace{\big(\mathbb{E}[\hat\theta]-\theta\big)^2}_{\text{偏差}^2}+\underbrace{\operatorname{Var}(\hat\theta)}_{\text{方差}}$$</div>
+<p><strong>无偏</strong>：$\mathbb{E}[\hat\theta]=\theta$。不代表单次准确，只代表大量重复取平均会逼近。</p>
+<h3>B.2 方差的加法</h3>
+<div class="math">$$\operatorname{Var}\Big(\sum_i X_i\Big)=\sum_i\operatorname{Var}(X_i)+2\sum_{i\lt j}\operatorname{Cov}(X_i,X_j)$$</div>
+<p>独立时协方差项为零，方差相加——这就是 MC 方差随步数线性增长的原因。</p>
+<h3>B.3 压缩映射（Banach 不动点）</h3>
+<p>若 $\|\mathcal{T}x-\mathcal{T}y\|\le\gamma\|x-y\|$ 且 $\gamma\lt1$，则 $\mathcal{T}$ 有唯一不动点 $x^*$，且任意初始点迭代 $x_{k+1}=\mathcal{T}x_k$ 都收敛，误差上界为 $\gamma^k\|x_0-x^*\|$。</p>
+<h3>B.4 重要性采样</h3>
+<div class="math">$$\mathbb{E}_{x\sim p}[f(x)]=\mathbb{E}_{x\sim q}\left[\frac{p(x)}{q(x)}f(x)\right]\quad(q(x)\gt0\text{ 当 }p(x)\gt0)$$</div>
+<p>估计量无偏，但方差可能极大——比值可能非常小或非常大。</p>
+<h3>B.5 对数导数技巧</h3>
+<div class="math">$$\nabla_\theta p_\theta(x)=p_\theta(x)\,\nabla_\theta\log p_\theta(x)$$</div>
+<p>这是策略梯度的全部魔法：把"对分布求导"变成"对 log 概率求导再乘回分布"。</p>
+<h3>B.6 Robbins–Monro</h3>
+<p>随机逼近 $x_{t+1}=x_t+\alpha_t(y_t-x_t)$ 收敛到 $\mathbb{E}[y_t]$，若 $\sum\alpha_t=\infty$ 且 $\sum\alpha_t^2\lt\infty$。</p>
+<!--/S-->
+
+<!--S:C|附录 C · 术语表-->
+<table>
+  <thead><tr><th>英文</th><th>中文</th><th>一句话</th></tr></thead>
+  <tbody>
+    <tr><td>MDP</td><td>马尔可夫决策过程</td><td>序贯决策的标准形式</td></tr>
+    <tr><td>POMDP</td><td>部分可观测 MDP</td><td>看不到真状态，要维护信念</td></tr>
+    <tr><td>policy</td><td>策略</td><td>状态到动作的映射</td></tr>
+    <tr><td>value function</td><td>值函数</td><td>未来折扣回报的期望</td></tr>
+    <tr><td>advantage</td><td>优势</td><td>动作比平均水平好多少</td></tr>
+    <tr><td>bootstrapping</td><td>自举</td><td>用估计更新估计</td></tr>
+    <tr><td>TD error</td><td>时序差分误差</td><td>新估计减旧估计</td></tr>
+    <tr><td>MC</td><td>蒙特卡洛</td><td>用完整回报做样本</td></tr>
+    <tr><td>eligibility trace</td><td>资格迹</td><td>按访问新旧加权的历史记忆</td></tr>
+    <tr><td>deadly triad</td><td>致命三角</td><td>函数逼近+自举+off-policy，会发散</td></tr>
+    <tr><td>on-policy</td><td>同策略</td><td>数据来自当前策略</td></tr>
+    <tr><td>off-policy</td><td>异策略</td><td>数据来自别的策略</td></tr>
+    <tr><td>importance sampling</td><td>重要性采样</td><td>用 q 的样本估 p 的期望</td></tr>
+    <tr><td>regret</td><td>遗憾</td><td>相对最优策略的累计损失</td></tr>
+    <tr><td>exploration bonus</td><td>探索奖励</td><td>给不确定的动作加分</td></tr>
+    <tr><td>trust region</td><td>信赖域</td><td>限制每步策略变化的范围</td></tr>
+    <tr><td>entropy regularization</td><td>熵正则</td><td>奖励策略的随机性</td></tr>
+    <tr><td>model-based</td><td>基于模型</td><td>先学环境再规划</td></tr>
+    <tr><td>MPC</td><td>模型预测控制</td><td>每步重规划，只执行第一步</td></tr>
+    <tr><td>MCTS</td><td>蒙特卡洛树搜索</td><td>用树搜索分配计算</td></tr>
+    <tr><td>value equivalence</td><td>价值等价</td><td>只要求价值一致，不要求重建</td></tr>
+    <tr><td>latent dynamics</td><td>隐空间动力学</td><td>在压缩表示上预测未来</td></tr>
+  </tbody>
+</table>
+<!--/S-->
