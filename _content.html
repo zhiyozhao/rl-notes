@@ -364,7 +364,84 @@
   <p>第一条保证能走到任意远处，第二条保证噪声最终被平均掉。$\alpha_t=1/t$ 满足；常数 $\alpha$ 不满足（但实践中常用常数，因为能跟踪非平稳性）。</p>
 </div>
 
-<h3>7.5 TD vs MC：一张对照</h3>
+<h3>7.5 为什么实践中反而用常数 α</h3>
+
+<p>上面说常数 α 不满足 Robbins–Monro，不能精确收敛。但工程里几乎都用常数 α。原因只有一个：<strong>真值本身在变</strong>。</p>
+
+<h4>两条条件到底在管什么</h4>
+<ul>
+  <li><strong>$\sum\alpha_t=\infty$</strong>：总步长要够大，否则会在半路"卡住"，走不到真值附近。</li>
+  <li><strong>$\sum\alpha_t^2\lt\infty$</strong>：步子必须越迈越小，否则噪声永远甩不掉，你会一直在真值附近晃。</li>
+</ul>
+<p>常数 α 违反了第二条。抖多大有闭式解：</p>
+<div class="math">$$\operatorname{Var}_\infty=\frac{\alpha\sigma^2}{2-\alpha}\ \approx\ \frac{\alpha\sigma^2}{2}\qquad(\alpha\ \text{很小})$$</div>
+<p class="read"><b>读法：</b>稳态抖动幅度约 $\sqrt{\alpha/2}\cdot\sigma$。α 每降 100 倍，抖动降到 1/10。</p>
+<p>实测（$x\leftarrow x+\alpha(\mu+\varepsilon-x)$，噪声 $\sigma=1$）：</p>
+<table>
+  <thead><tr><th>α</th><th>理论稳态标准差 $\sqrt{\alpha/(2-\alpha)}$</th><th>实测</th></tr></thead>
+  <tbody>
+    <tr><td>0.1</td><td>0.229</td><td>0.229</td></tr>
+    <tr><td>0.01</td><td>0.071</td><td>0.069</td></tr>
+    <tr><td>0.001</td><td>0.022</td><td>0.023</td></tr>
+  </tbody>
+</table>
+
+<h4>目标一旦跳变，两者差一个数量级</h4>
+<p>仿真：前 10000 步真值 $\mu=0$，第 10000 步突然跳到 $\mu=1$。</p>
+<table>
+  <thead><tr><th>时刻</th><th>常数 α = 0.01</th><th>α = 1/t</th></tr></thead>
+  <tbody>
+    <tr><td>9999（跳变前）</td><td>0.083</td><td>−0.002</td></tr>
+    <tr><td>10200（+200 步）</td><td><strong>0.666</strong></td><td>0.017</td></tr>
+    <tr><td>11000（+1000 步）</td><td><strong>1.231</strong>（被噪声冲过头）</td><td>0.089</td></tr>
+    <tr><td>15000（+5000 步）</td><td>1.078</td><td>0.337</td></tr>
+    <tr><td>20000（+10000 步）</td><td><strong>1.009</strong> ✓ 追上了</td><td><strong>0.507</strong> ✗ 还在一半</td></tr>
+  </tbody>
+</table>
+<p>常数 α 只用几百步就追上新目标；$\alpha_t=1/t$ 走了一万步还在一半。</p>
+
+<h4>本质区别：窗口</h4>
+<table>
+  <thead><tr><th></th><th>常数 α</th><th>$\alpha_t=1/t$</th></tr></thead>
+  <tbody>
+    <tr><td>本质</td><td>指数滑动平均（EMA）</td><td>全体历史平均</td></tr>
+    <tr><td>有效窗口</td><td>$1/\alpha$，固定（α=0.01 时约 100 步）</td><td>$t$ 步，<strong>而且不断变长</strong></td></tr>
+    <tr><td>老数据权重</td><td>按 $(1-\alpha)^k$ 衰减</td><td>$1/t$，越来越小</td></tr>
+    <tr><td>能否跟踪漂移</td><td>能</td><td>不能</td></tr>
+  </tbody>
+</table>
+<div class="callout warn">
+  <span class="label">关键细节</span>
+  <p>$\alpha_t=1/t$ 的问题不是"窗口是 10000"，而是<strong>窗口每步都在变长</strong>——$t$ 越大，新样本的权重 $1/t$ 越小。</p>
+  <p>到第 20000 步时，一个新样本只让估计移动 $0.00005$。所以它永远追不上。</p>
+</div>
+
+<h4>为什么 RL 里"非平稳"是常态</h4>
+<ol>
+  <li><strong>策略在变</strong>：每更新一次 $\pi$，$V^\pi$ 的定义就变了。你估的真值本身在移动。</li>
+  <li><strong>自举让目标在动</strong>：TD 的目标是 $r+\gamma V(s')$，而 $V$ 自己在被更新——目标跟着估计一起漂。</li>
+  <li><strong>函数逼近会串台</strong>：更新 $s$ 的参数会顺带改变 $s'$ 的预测值（权重共享），别人的"真值"也在动。</li>
+  <li><strong>off-policy 的分布也在漂移</strong>：行为策略变了，采样到的状态分布跟着变。</li>
+</ol>
+<p>所以严格意义的"收敛"在深度 RL 里基本不成立，我们实际追求的是<strong>跟踪（tracking）</strong>而不是<strong>收敛（convergence）</strong>。</p>
+
+<h4>稳定性 vs 可塑性</h4>
+<div class="math">$$\alpha\ \text{大}\ \Rightarrow\ \text{追得快，但抖得厉害}\qquad \alpha\ \text{小}\ \Rightarrow\ \text{稳，但追不上变化}$$</div>
+<table>
+  <thead><tr><th>目的</th><th>选择</th></tr></thead>
+  <tbody>
+    <tr><td>表格型、环境真平稳、要精确值</td><td>$\alpha_t=1/t$</td></tr>
+    <tr><td>深度 RL（PPO / SAC / DQN）</td><td>常数 $\alpha$，通常 $10^{-4}\sim10^{-3}$</td></tr>
+    <tr><td>训练末期想收敛得干净些</td><td>线性 / 余弦衰减</td></tr>
+    <tr><td>既要估计准、又要参数稳</td><td>参数做 Polyak 平均：$\bar\theta\leftarrow\tau\bar\theta+(1-\tau)\theta$</td></tr>
+  </tbody>
+</table>
+<div class="callout">
+  <span class="label">一句话</span>
+  <p>$\alpha_t=1/t$ 是<strong>数学家要的收敛</strong>，常数 $\alpha$ 是<strong>工程师要的跟踪</strong>。RL 里目标一直在动，所以工程上选后者。</p>
+</div>
+
+<h3>7.6 TD vs MC：一张对照</h3>
 <table>
   <thead><tr><th></th><th>MC</th><th>TD(0)</th></tr></thead>
   <tbody>

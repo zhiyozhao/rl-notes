@@ -91,7 +91,7 @@ HEAD = """<!DOCTYPE html>
 每个算法给出正确的数学形式、推导线索和它要解决的问题。最后用四条轴和五个根本难题把整个领域串起来。</p>
 <div class="meta">
   <span class="chip">21 节 + 3 附录</span>
-  <span class="chip">465 个公式</span>
+  <span class="chip">__NFORM__ 个公式</span>
   <span class="chip">单页滚动</span>
   <span class="chip">明暗双主题</span>
 </div>
@@ -245,6 +245,13 @@ __BODY__
 </html>
 """
 
-html = HEAD.replace("__SIDEBAR__", sidebar).replace("__BODY__", body)
+tmp = body.replace('$$', '\x00')
+n_disp = tmp.count('\x00') // 2
+n_inl  = len(re.findall(r'\$[^$\n]+\$', tmp))
+nform  = n_disp + n_inl
+
+html = (HEAD.replace("__SIDEBAR__", sidebar)
+            .replace("__BODY__", body)
+            .replace("__NFORM__", str(nform)))
 (ROOT / "index.html").write_text(html, encoding="utf-8")
-print("sections:", len(secs), "| chars:", len(html))
+print("sections:", len(secs), "| formulas:", nform, "| chars:", len(html))
