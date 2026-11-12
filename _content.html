@@ -541,16 +541,112 @@ G^\lambda &= 0.5\times 4.600 + 0.25\times 4.330 + 0.125\times 4.168 + 0.125\time
 <p>检查：λ=0 时是 4.600，λ=1 时是 3.439，λ=0.5 得 4.333 —— <strong>确实在中间</strong>。</p>
 
 <h3>8.5 代码里用的是递推写法</h3>
-<div class="math">$$\boxed{G_t=r_t+\gamma\Big[(1-\lambda)V(s_{t+1})+\lambda G_{t+1}\Big]},\qquad G_T=V(s_T)$$</div>
-<p><strong>从后往前算</strong>（λ=0.5）：</p>
+
+<p>8.3 给的定义是"对 n 步回报加权平均"，但代码里从来不那样写——那要求你先算出所有 $G^{(n)}$，也就是<strong>等整局结束</strong>。实际工程用的是一行<strong>递推</strong>：</p>
+
+<div class="math">$$\boxed{G_t=r_t+\gamma\Big[(1-\lambda)\,V(s_{t+1})+\lambda\,G_{t+1}\Big]},\qquad G_T=V(s_T)$$</div>
+
+<h4>先给直觉：每一步抛一次硬币</h4>
+
+<p>把 $\lambda$ 想成"<strong>走完这一步之后，继续往前推的概率</strong>"。每到一个新位置就问一次：</p>
+<ul>
+  <li>以 <strong>$1-\lambda$</strong> 的概率说"够了"——剩下的用 $V(s_{t+1})$ 估一个数；</li>
+  <li>以 <strong>$\lambda$</strong> 的概率说"再走一步"——然后在下一个位置<strong>重复同样的决定</strong>。</li>
+</ul>
+
+<p>λ = 0.5 时，这个过程给出的四个权重正好就是 8.4 用过的那四个：</p>
+
+<table>
+  <thead><tr><th>硬币停在哪</th><th>概率</th><th>用哪个回报</th><th>数值</th></tr></thead>
+  <tbody>
+    <tr><td>1 步后就停</td><td>$1-\lambda=0.5$</td><td>$G^{(1)}$</td><td>4.600</td></tr>
+    <tr><td>2 步后停</td><td>$\lambda(1-\lambda)=0.25$</td><td>$G^{(2)}$</td><td>4.330</td></tr>
+    <tr><td>3 步后停</td><td>$\lambda^2(1-\lambda)=0.125$</td><td>$G^{(3)}$</td><td>4.168</td></tr>
+    <tr><td>一直走到底</td><td>$\lambda^3=0.125$</td><td>$G^{(4)}$</td><td>3.439</td></tr>
+    <tr><td colspan="3"><strong>加权平均</strong></td><td><strong>4.333</strong></td></tr>
+  </tbody>
+</table>
+
+<p>而这个"每到一个位置就重新问一次"的过程，本身就是递归：</p>
+
+<div class="math">$$G_t=\underbrace{r_t}_{\text{这一步拿到的}}+\gamma\Big[\underbrace{(1-\lambda)\,V(s_{t+1})}_{\text{"够了"：用估值兜底}}+\underbrace{\lambda\,G_{t+1}}_{\text{"再走一步"：递归下去}}\Big]$$</div>
+<p class="read"><b>读法：</b>λ 就是这两个括号之间的<strong>配比</strong>。λ 越大，越倾向"再走一步"（看得越远）；λ 越小，越倾向"用估值兜底"（看得越近）。</p>
+
+<h4>代数验证：从加权平均推出递推式</h4>
+
+<p>不是"看着像"，可以严格推出来。起点是 8.3 的定义：</p>
+
+<div class="math">$$G_t^{\lambda}=(1-\lambda)\sum_{n\ge1}\lambda^{n-1}G_t^{(n)}$$</div>
+
+<p>把第一项单独拿出来，其余项用 $G_t^{(n)}=r_t+\gamma G_{t+1}^{(n-1)}$ 展开：</p>
+
+<div class="math">$$\begin{aligned}
+G_t^{\lambda}
+&=(1-\lambda)\,G_t^{(1)}+(1-\lambda)\sum_{n\ge2}\lambda^{n-1}\Big(r_t+\gamma\,G_{t+1}^{(n-1)}\Big)\\[2pt]
+&=(1-\lambda)\big(r_t+\gamma V_{t+1}\big)
+  \;+\;\underbrace{(1-\lambda)\,r_t\sum_{n\ge2}\lambda^{n-1}}_{=\;\lambda r_t}
+  \;+\;\gamma\lambda\underbrace{(1-\lambda)\sum_{m\ge1}\lambda^{m-1}G_{t+1}^{(m)}}_{=\,G_{t+1}^{\lambda}}\\[2pt]
+&=r_t+\gamma(1-\lambda)V_{t+1}+\gamma\lambda\,G_{t+1}^{\lambda}
+\end{aligned}$$</div>
+
+<p>第三行用到两件事：</p>
+<ul>
+  <li>$\sum_{n\ge2}\lambda^{n-1}=\dfrac{\lambda}{1-\lambda}$，所以 $(1-\lambda)r_t\cdot\dfrac{\lambda}{1-\lambda}=\lambda r_t$；</li>
+  <li>把下标换成 $m=n-1$，后半段正好是 $G_{t+1}^{\lambda}$ 的定义式乘上 $\gamma\lambda$。</li>
+</ul>
+<p>最后把 $r_t$ 的两份（$(1-\lambda)r_t$ 和 $\lambda r_t$）合并，就得到递推式。$\square$</p>
+
+<h4>把递推展开，看得更清楚</h4>
+
+<p>连续展开两次：</p>
+<div class="math">$$\begin{aligned}
+G_t&=r_t+\gamma(1-\lambda)V_{t+1}+\gamma\lambda\,G_{t+1}\\
+&=r_t+\gamma(1-\lambda)V_{t+1}
+  +\gamma\lambda\Big[r_{t+1}+\gamma(1-\lambda)V_{t+2}+\gamma\lambda G_{t+2}\Big]\\
+&=r_t+\gamma\lambda\,r_{t+1}
+  +\gamma(1-\lambda)V_{t+1}+\gamma^2\lambda(1-\lambda)V_{t+2}
+  +\gamma^2\lambda^2 G_{t+2}
+\end{aligned}$$</div>
+
+<p>一直展开到底，得到一个很干净的闭式：</p>
+<div class="math">$$G_t=\sum_{k\ge0}(\gamma\lambda)^{k}\,r_{t+k}\;+\;\gamma(1-\lambda)\sum_{k\ge0}(\gamma\lambda)^{k}\,V_{t+1+k}$$</div>
+<p class="read"><b>读法：</b>λ-回报 = 把未来奖励按 $\gamma\lambda$ 衰减后加起来 + 把未来估值也按 $\gamma\lambda$ 衰减后加起来（再乘一个 $\gamma(1-\lambda)$）。</p>
+
+<p>由此能直接读出两件事：</p>
+<ul>
+  <li><strong>奖励的权重</strong>：$r_t$ 是 1，$r_{t+1}$ 是 $\gamma\lambda$，$r_{t+2}$ 是 $\gamma^2\lambda^2$…… 所以有效视野是 $1/(1-\gamma\lambda)$，比只看 $\gamma$ 时更短（因为多乘了一个 λ）。</li>
+  <li><strong>估值不是只在某一步出现</strong>：$V_{t+1}, V_{t+2}, \dots$ 全都以衰减权重参与，只是权重和为 1。所以 λ 控制的不是"从哪一步开始用估值"，而是"估值和真实奖励的混合比例"。</li>
+</ul>
+
+<h4>手算一遍（λ=0.5，接 8.2 的轨迹）</h4>
+
+<p>从后往前，每一步都只用到"下一时刻的 $G$"：</p>
 <pre><code>G₄ = V(s₄) = 0
 
 G₃ = 1 + 0.9×[0.5×0 + 0.5×0]              = 1.000
 G₂ = 1 + 0.9×[0.5×2.0 + 0.5×1.000]        = 1 + 0.9×1.5    = 2.350
 G₁ = 1 + 0.9×[0.5×3.0 + 0.5×2.350]        = 1 + 0.9×2.675  = 3.408
 G₀ = 1 + 0.9×[0.5×4.0 + 0.5×3.408]        = 1 + 0.9×3.704  = 4.333  ✓</code></pre>
-<p><strong>和上面加权平均算出的一模一样。</strong></p>
-<p>递推写法的读法：第 t 步的值 = 现在的奖励 + 打折后的［一小部分用"对下一步的价值估计"，一大部分用"继续往后算出来的值"］。λ 就是这两部分的比例。</p>
+
+<p><strong>和上面加权平均算出的 4.333 一模一样。</strong></p>
+
+<h4>为什么工程上必须用递推</h4>
+
+<table>
+  <thead><tr><th></th><th>加权平均（前向定义）</th><th>递推（工程实现）</th></tr></thead>
+  <tbody>
+    <tr><td>需要什么</td><td>所有 $G^{(n)}$，即整局的奖励</td><td>只需 $r_t$、$V(s_{t+1})$、$G_{t+1}$</td></tr>
+    <tr><td>何时能算</td><td>回合结束后</td><td>每一步都能算</td></tr>
+    <tr><td>时间复杂度</td><td>$O(H^2)$（每个 $n$ 重算一遍）</td><td>$O(H)$（从后往前一趟）</td></tr>
+    <tr><td>能否在线</td><td>不能</td><td>能（配合资格迹，见 8.7）</td></tr>
+    <tr><td>能否用于持续任务</td><td>不能</td><td>能</td></tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  <span class="label">记这一句就够了</span>
+  <p><strong>加权平均是"定义"，递推是"算法"。</strong>两者数学等价，但只有递推能在不知道未来的情况下，一步一步往前算。</p>
+</div>
 
 <h3>8.6 一个关键恒等式</h3>
 <div class="math">$$\boxed{G_t^{\lambda}=V(s_t)+\sum_{k\ge t}(\gamma\lambda)^{k-t}\,\delta_k}$$</div>
