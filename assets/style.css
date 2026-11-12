@@ -197,6 +197,11 @@ td .katex,th .katex{font-size:1em}
 .read b{color:var(--fg-2);font-weight:600}
 
 /* ---------- 表格 ---------- */
+.table-wrap{
+  overflow-x:auto;-webkit-overflow-scrolling:touch;
+  margin:20px 0;border-radius:10px;
+}
+.table-wrap table{margin:0}
 table{
   border-collapse:separate;border-spacing:0;width:100%;margin:20px 0;
   font-size:13.7px;line-height:1.62;font-variant-numeric:tabular-nums;
@@ -262,6 +267,19 @@ footer{
   color:var(--muted);font-size:12.5px;
 }
 
+/* ---------- 移动端抽屉控件（桌面隐藏） ---------- */
+#navBtn{display:none}
+#navClose{
+  display:none;position:absolute;z-index:2;
+  top:calc(16px + env(safe-area-inset-top));right:12px;
+  width:28px;height:28px;padding:0;cursor:pointer;
+  align-items:center;justify-content:center;line-height:1;
+  border:1px solid var(--line);border-radius:8px;
+  background:var(--card);color:var(--muted);font-size:15px;
+}
+#navClose:hover{color:var(--accent);border-color:var(--accent)}
+#scrim{display:none}
+
 /* ---------- 进度条 & 回顶 ---------- */
 #progress{
   position:fixed;top:0;left:0;height:2px;width:0;background:var(--accent);
@@ -282,30 +300,71 @@ footer{
 
 /* ---------- 响应式 ---------- */
 @media (max-width:1080px){
-  .layout{grid-template-columns:1fr}
-  aside{
-    position:sticky;top:0;z-index:40;height:auto;max-height:none;
-    border-right:0;border-bottom:1px solid var(--line);
-    padding:14px 18px 10px;background:color-mix(in srgb,var(--bg) 92%,transparent);
+  .layout{grid-template-columns:minmax(0,1fr);max-width:none}
+
+  /* 汉堡按钮 */
+  #navBtn{
+    display:flex;align-items:center;justify-content:center;
+    position:fixed;left:14px;top:calc(14px + env(safe-area-inset-top));z-index:90;
+    width:38px;height:38px;padding:0;cursor:pointer;
+    border:1px solid var(--line);border-radius:11px;
+    background:color-mix(in srgb,var(--card) 86%,transparent);
     backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    color:var(--fg);box-shadow:var(--shadow);
+    transition:border-color .15s ease,opacity .2s ease,transform .2s ease;
   }
-  aside .brand{padding-right:44px}
-  .theme-btn{top:12px;right:14px}
-  nav{display:flex;flex-wrap:wrap;gap:2px;margin-top:10px;max-height:132px;overflow-y:auto}
-  nav .grp{width:100%;margin:8px 0 2px}
-  nav a{flex:0 0 auto;padding:3px 9px}
-  nav a .n{flex:0 0 auto}
-  main{padding:26px 20px 90px}
+  #navBtn:active{border-color:var(--accent)}
+
+  /* 侧栏变抽屉 */
+  aside{
+    position:fixed;top:0;left:0;z-index:85;
+    height:100%;width:276px;max-width:84vw;
+    padding:calc(20px + env(safe-area-inset-top)) 10px 36px 18px;
+    border-right:1px solid var(--line);
+    background:var(--bg);
+    transform:translateX(-102%);
+    transition:transform .3s cubic-bezier(.32,.72,0,1);
+    box-shadow:0 0 60px -10px rgba(0,0,0,.45);
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+  body.nav-open aside{transform:none}
+  body.nav-open{overflow:hidden}
+  body.nav-open #navBtn{opacity:0;pointer-events:none;transform:scale(.92)}
+
+  /* 遮罩 */
+  #scrim{
+    display:block;position:fixed;inset:0;z-index:80;
+    background:rgba(8,12,16,.42);
+    backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);
+    opacity:0;pointer-events:none;
+    transition:opacity .28s ease;
+  }
+  body.nav-open #scrim{opacity:1;pointer-events:auto}
+
+  /* 抽屉内按钮位置 */
+  .theme-btn{top:calc(16px + env(safe-area-inset-top));right:48px}
+  #navClose{display:flex}
+
+  aside .brand{padding-right:88px}
+
+  nav{display:block;margin-top:18px}
+  nav a{padding:8px 10px;font-size:14px;border-radius:8px}
+  nav a .n{font-size:11px;flex:0 0 18px}
+  nav .grp{margin:18px 0 6px;font-size:10px}
+
+  main{padding:64px 20px 96px}
   h1{font-size:26px}
   h2{font-size:20px;margin-top:52px}
   .grid2{grid-template-columns:1fr}
   table{font-size:12.8px}
   th,td{padding:8px 9px}
+  #toTop{right:16px;bottom:16px}
 }
 
 @media print{
   aside,#toTop,#progress{display:none}
-  .layout{grid-template-columns:1fr;max-width:none}
+  .layout{grid-template-columns:minmax(0,1fr);max-width:none}
   main{padding:0}
   pre{white-space:pre-wrap}
   h2{page-break-after:avoid}

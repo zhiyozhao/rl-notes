@@ -19,6 +19,9 @@
 </head>
 <body id="top">
 <div id="progress"></div>
+<button id="navBtn" type="button" aria-label="打开目录" aria-expanded="false" aria-controls="toc">
+  <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+</button>
 <div class="layout">
 
 <aside>
@@ -27,6 +30,7 @@
     <svg class="i-moon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
     <svg class="i-sun" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.2v2.2M12 19.6v2.2M2.2 12h2.2M19.6 12h2.2M4.9 4.9l1.6 1.6M17.5 17.5l1.6 1.6M19.1 4.9l-1.6 1.6M6.5 17.5l-1.6 1.6"/></svg>
   </button>
+  <button id="navClose" type="button" aria-label="关闭目录">×</button>
   <nav id="toc">
     <a href="#s1"><span class="n">1</span><span class="t">记号表</span></a>
     <div class="grp">I · 形式化</div>
@@ -90,7 +94,7 @@
 </div>
 
 <h3>1.2 核心符号</h3>
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>符号</th><th>含义</th></tr></thead>
   <tbody>
     <tr><td>$\mathcal{S},\ \mathcal{A}$</td><td>状态空间、动作空间</td></tr>
@@ -112,7 +116,7 @@
     <tr><td>$d^\pi(s)$</td><td>策略 $\pi$ 下的状态分布</td></tr>
     <tr><td>$D_{KL}(p\|q)$</td><td>KL 散度</td></tr>
   </tbody>
-</table>
+</table></div>
 
 <h3>1.3 三个容易混的地方</h3>
 <div class="callout">
@@ -248,13 +252,13 @@
 
 <h4>5.3.2 公式逐项拆开</h4>
 <div class="math">$$V^*(b)=\max_{a}\Big[\underbrace{\sum_s b(s)R(s,a)}_{\text{(1) 即时期望奖励}}+\gamma\underbrace{\sum_{o'}\Pr(o'\mid b,a)\,V^*\big(\tau(b,a,o')\big)}_{\text{(2) 按看到什么加权的未来}}\Big]$$</div>
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>项</th><th>是什么</th><th>对应 MDP 里的什么</th></tr></thead>
   <tbody>
     <tr><td>(1) $\sum_s b(s)R(s,a)$</td><td>不知道 $s$，就按 $b$ 对 $R(s,a)$ 加权平均</td><td>就是 $R(s,a)$，只是从"确定"变成"期望"</td></tr>
     <tr><td>(2) $\sum_{o'}\Pr(o'|b,a)V^*(\tau)$</td><td>下一步的"状态"不再是 $s'$，而是<strong>新信念</strong> $\tau$；而 $\tau$ 取决于你看到了什么 $o'$，所以要对 $o'$ 加权</td><td>对应 $\gamma\sum_{s'}P(s'|s,a)V(s')$</td></tr>
   </tbody>
-</table>
+</table></div>
 <div class="callout blue">
   <span class="label">一句话看懂这个换元</span>
   <p><strong>MDP：</strong>做了 $a$ 之后，世界去 $s'$，按 $P(s'|s,a)$ 加权。</p>
@@ -288,7 +292,7 @@
 
 <h4>5.3.5 手算一个最小例子：门口有没有人</h4>
 <p><strong>设定：</strong></p>
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>元素</th><th>取值</th></tr></thead>
   <tbody>
     <tr><td>状态 $\mathcal{S}$</td><td>$H$＝有人，$N$＝没人。<strong>状态静止</strong>：$P(s'|s,a)=1$</td></tr>
@@ -297,15 +301,15 @@
     <tr><td>奖励</td><td>$R(H,\text{go})=-100$，$R(N,\text{go})=+10$，$R(H,\text{brake})=-1$，$R(N,\text{brake})=0$</td></tr>
     <tr><td>观测模型</td><td><strong>通过</strong>：$O(\text{see}|H)=0.2$，$O(\text{see}|N)=0.05$<br><strong>减速</strong>：$O(\text{see}|H)=0.95$，$O(\text{see}|N)=0.05$</td></tr>
   </tbody>
-</table>
+</table></div>
 <p><strong>先看一步（$\gamma=0$）</strong>：$V_1(b)=\max_a\sum_s b(s)R(s,a)$</p>
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>信念</th><th>通过</th><th>减速</th><th>选</th></tr></thead>
   <tbody>
     <tr><td>$b(H)=0.10$</td><td>$0.1(-100)+0.9(10)=-1$</td><td>$0.1(-1)+0.9(0)=-0.1$</td><td><strong>减速</strong></td></tr>
     <tr><td>$b(H)=0.02$</td><td>$0.02(-100)+0.98(10)=7.8$</td><td>$-0.02$</td><td><strong>通过</strong></td></tr>
   </tbody>
-</table>
+</table></div>
 <p>临界点解 $10-110b=-b$，得 $b=\frac{10}{109}\approx9.17\%$。<strong>信念超过 9.17% 就减速。</strong></p>
 <p><strong>再看两步（取 $\gamma=1$，把 (2) 那一项算出来）</strong>：</p>
 <div class="math">$$V_2(b)=\max_a\Big[\sum_s b(s)R(s,a)+\sum_{o'}\Pr(o'|b,a)\,V_1\big(\tau(b,a,o')\big)\Big]$$</div>
@@ -356,7 +360,7 @@
 <p>但 5.2 的更新有一个固定的<strong>递归形式</strong>：$b_{t+1}=f(b_t,a_t,o_{t+1})$。所以你可以不去算真实的 $b$，而是<strong>学一个递归函数来逼近它</strong>：</p>
 <div class="math">$$h_t=f_\theta(h_{t-1},\ a_{t-1},\ o_t)\ \approx\ \text{一个与 }b_t\text{ 等价的充分统计量}$$</div>
 <p class="read"><b>读法：</b>$h_t$ 是网络内部的一个向量，它不需要真的等于 $b_t$，只需要"携带同样的决策所需信息"。</p>
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>理论</th><th>工程对应</th></tr></thead>
   <tbody>
     <tr><td>信念 $b_t$</td><td>RNN / LSTM / GRU 的隐状态 $h_t$</td></tr>
@@ -364,7 +368,7 @@
     <tr><td>长历史依赖</td><td>Transformer 的 attention（在整段历史上重新加权）</td></tr>
     <tr><td>世界模型里的 RSSM</td><td>确定性记忆 $h_t$ + 随机信念 $z_t$ 的显式分工</td></tr>
   </tbody>
-</table>
+</table></div>
 <div class="callout">
   <span class="label">一句话把三件事串起来</span>
   <p><strong>POMDP</strong> 说：决策应该基于信念。</p>
@@ -465,18 +469,18 @@
 <div class="math">$$\operatorname{Var}_\infty=\frac{\alpha\sigma^2}{2-\alpha}\ \approx\ \frac{\alpha\sigma^2}{2}\qquad(\alpha\ \text{很小})$$</div>
 <p class="read"><b>读法：</b>稳态抖动幅度约 $\sqrt{\alpha/2}\cdot\sigma$。α 每降 100 倍，抖动降到 1/10。</p>
 <p>实测（$x\leftarrow x+\alpha(\mu+\varepsilon-x)$，噪声 $\sigma=1$）：</p>
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>α</th><th>理论稳态标准差 $\sqrt{\alpha/(2-\alpha)}$</th><th>实测</th></tr></thead>
   <tbody>
     <tr><td>0.1</td><td>0.229</td><td>0.229</td></tr>
     <tr><td>0.01</td><td>0.071</td><td>0.069</td></tr>
     <tr><td>0.001</td><td>0.022</td><td>0.023</td></tr>
   </tbody>
-</table>
+</table></div>
 
 <h4>目标一旦跳变，两者差一个数量级</h4>
 <p>仿真：前 10000 步真值 $\mu=0$，第 10000 步突然跳到 $\mu=1$。</p>
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>时刻</th><th>常数 α = 0.01</th><th>α = 1/t</th></tr></thead>
   <tbody>
     <tr><td>9999（跳变前）</td><td>0.083</td><td>−0.002</td></tr>
@@ -485,11 +489,11 @@
     <tr><td>15000（+5000 步）</td><td>1.078</td><td>0.337</td></tr>
     <tr><td>20000（+10000 步）</td><td><strong>1.009</strong> ✓ 追上了</td><td><strong>0.507</strong> ✗ 还在一半</td></tr>
   </tbody>
-</table>
+</table></div>
 <p>常数 α 只用几百步就追上新目标；$\alpha_t=1/t$ 走了一万步还在一半。</p>
 
 <h4>本质区别：窗口</h4>
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th></th><th>常数 α</th><th>$\alpha_t=1/t$</th></tr></thead>
   <tbody>
     <tr><td>本质</td><td>指数滑动平均（EMA）</td><td>全体历史平均</td></tr>
@@ -497,7 +501,7 @@
     <tr><td>老数据权重</td><td>按 $(1-\alpha)^k$ 衰减</td><td>$1/t$，越来越小</td></tr>
     <tr><td>能否跟踪漂移</td><td>能</td><td>不能</td></tr>
   </tbody>
-</table>
+</table></div>
 <div class="callout warn">
   <span class="label">关键细节</span>
   <p>$\alpha_t=1/t$ 的问题不是"窗口是 10000"，而是<strong>窗口每步都在变长</strong>——$t$ 越大，新样本的权重 $1/t$ 越小。</p>
@@ -515,7 +519,7 @@
 
 <h4>稳定性 vs 可塑性</h4>
 <div class="math">$$\alpha\ \text{大}\ \Rightarrow\ \text{追得快，但抖得厉害}\qquad \alpha\ \text{小}\ \Rightarrow\ \text{稳，但追不上变化}$$</div>
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>目的</th><th>选择</th></tr></thead>
   <tbody>
     <tr><td>表格型、环境真平稳、要精确值</td><td>$\alpha_t=1/t$</td></tr>
@@ -523,14 +527,14 @@
     <tr><td>训练末期想收敛得干净些</td><td>线性 / 余弦衰减</td></tr>
     <tr><td>既要估计准、又要参数稳</td><td>参数做 Polyak 平均：$\bar\theta\leftarrow\tau\bar\theta+(1-\tau)\theta$</td></tr>
   </tbody>
-</table>
+</table></div>
 <div class="callout">
   <span class="label">一句话</span>
   <p>$\alpha_t=1/t$ 是<strong>数学家要的收敛</strong>，常数 $\alpha$ 是<strong>工程师要的跟踪</strong>。RL 里目标一直在动，所以工程上选后者。</p>
 </div>
 
 <h3>7.6 TD vs MC：一张对照</h3>
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th></th><th>MC</th><th>TD(0)</th></tr></thead>
   <tbody>
     <tr><td>目标</td><td>$G_t$</td><td>$r_t+\gamma V(s_{t+1})$</td></tr>
@@ -541,7 +545,7 @@
     <tr><td>能否在线</td><td>否</td><td>是</td></tr>
     <tr><td>对模型误差</td><td>免疫</td><td>敏感</td></tr>
   </tbody>
-</table>
+</table></div>
 <div class="callout blue">
   <span class="label">一句好记的总结</span>
   <p><strong>MC 用"事实"当老师，TD 用"猜测"当老师。</strong>事实可靠但来得慢；猜测来得快但可能是错的。</p>
@@ -553,7 +557,7 @@
 <p>这一节是全书最绕的地方。我们分六步走，每一步都配一条具体的轨迹。</p>
 
 <h3>8.1 先回顾：为什么需要 n</h3>
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th></th><th>MC</th><th>TD(0)</th></tr></thead>
   <tbody>
     <tr><td>用什么当目标</td><td>$G_t$（真的走到底）</td><td>$r_t+\gamma V(s_{t+1})$（只走一步）</td></tr>
@@ -561,7 +565,7 @@
     <tr><td>方差</td><td>大</td><td>小</td></tr>
     <tr><td>要不要等</td><td>要等整局结束</td><td>走一步就能更新</td></tr>
   </tbody>
-</table>
+</table></div>
 <p><strong>n 步就是在两者之间选一个中间点。</strong></p>
 
 <h3>8.2 n 步回报是什么</h3>
@@ -575,7 +579,7 @@
 <p>假设网络当前的价值估计<strong>偏高</strong>：$V(s_0)=4.5,\ V(s_1)=4.0,\ V(s_2)=3.0,\ V(s_3)=2.0,\ V(s_4)=0$</p>
 <p><strong>真实回报</strong>（MC，从 s0 走到底）：$1 + 0.9 + 0.81 + 0.729 = 3.439$</p>
 <p>现在算从 $s_0$ 出发的各种 n 步回报：</p>
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>n</th><th>算式</th><th>结果</th><th>偏差</th></tr></thead>
   <tbody>
     <tr><td>1</td><td>$1+0.9\times4.0$</td><td><strong>4.600</strong></td><td>+1.16</td></tr>
@@ -583,12 +587,12 @@
     <tr><td>3</td><td>$1+0.9+0.81+0.729\times2.0$</td><td><strong>4.168</strong></td><td>+0.73</td></tr>
     <tr><td>4</td><td>$1+0.9+0.81+0.729$</td><td><strong>3.439</strong></td><td>0</td></tr>
   </tbody>
-</table>
+</table></div>
 <p><strong>看这一列</strong>：n 越大，偏差越小。因为 $V$ 进入的权重是 $\gamma^n$，n 越大它的影响越小。但 n 越大，方差也越大。这就是那个取舍。</p>
 
 <h3>8.3 λ 不是"选一个 n"，而是"全都要"</h3>
 <div class="math">$$G_t^{\lambda}=(1-\lambda)\Big[G_t^{(1)}+\lambda G_t^{(2)}+\lambda^2 G_t^{(3)}+\cdots\Big]$$</div>
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>n</th><th>权重</th></tr></thead>
   <tbody>
     <tr><td>1</td><td>$1-\lambda$</td></tr>
@@ -597,7 +601,7 @@
     <tr><td>4</td><td>$(1-\lambda)\lambda^3$</td></tr>
     <tr><td>…</td><td>…</td></tr>
   </tbody>
-</table>
+</table></div>
 
 <h4>为什么权重长这样（最该讲清楚的地方）</h4>
 <p><strong>想象你在抛硬币决定"这次要往前推几步"</strong>：</p>
@@ -645,7 +649,7 @@ G^\lambda &= 0.5\times 4.600 + 0.25\times 4.330 + 0.125\times 4.168 + 0.125\time
 
 <p>λ = 0.5 时，这个过程给出的四个权重正好就是 8.4 用过的那四个：</p>
 
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>硬币停在哪</th><th>概率</th><th>用哪个回报</th><th>数值</th></tr></thead>
   <tbody>
     <tr><td>1 步后就停</td><td>$1-\lambda=0.5$</td><td>$G^{(1)}$</td><td>4.600</td></tr>
@@ -654,7 +658,7 @@ G^\lambda &= 0.5\times 4.600 + 0.25\times 4.330 + 0.125\times 4.168 + 0.125\time
     <tr><td>一直走到底</td><td>$\lambda^3=0.125$</td><td>$G^{(4)}$</td><td>3.439</td></tr>
     <tr><td colspan="3"><strong>加权平均</strong></td><td><strong>4.333</strong></td></tr>
   </tbody>
-</table>
+</table></div>
 
 <p>而这个"每到一个位置就重新问一次"的过程，本身就是递归：</p>
 
@@ -721,7 +725,7 @@ G₀ = 1 + 0.9×[0.5×4.0 + 0.5×3.408]        = 1 + 0.9×3.704  = 4.333  ✓</c
 
 <h4>为什么工程上必须用递推</h4>
 
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th></th><th>加权平均（前向定义）</th><th>递推（工程实现）</th></tr></thead>
   <tbody>
     <tr><td>需要什么</td><td>所有 $G^{(n)}$，即整局的奖励</td><td>只需 $r_t$、$V(s_{t+1})$、$G_{t+1}$</td></tr>
@@ -730,7 +734,7 @@ G₀ = 1 + 0.9×[0.5×4.0 + 0.5×3.408]        = 1 + 0.9×3.704  = 4.333  ✓</c
     <tr><td>能否在线</td><td>不能</td><td>能（配合资格迹，见 8.7）</td></tr>
     <tr><td>能否用于持续任务</td><td>不能</td><td>能</td></tr>
   </tbody>
-</table>
+</table></div>
 
 <div class="callout">
   <span class="label">记这一句就够了</span>
@@ -765,7 +769,7 @@ V(s₀) + (−0.1666) = 4.5 − 0.1666 = 4.333  ✓</code></pre>
 <div class="math">$$E_t(s)=\gamma\lambda\,E_{t-1}(s)+\mathbf{1}\{s_t=s\},\qquad V(s)\leftarrow V(s)+\alpha\,\delta_t\,E_t(s)$$</div>
 <p class="read"><b>读法：</b>这一步的 TD 误差，按"这个状态最近被访问过多少"分摊给所有状态。越久远的访问，衰减得越多（衰减率就是 $\gamma\lambda$）。</p>
 <h4>走一遍这条轨迹（λ=0.5，$\gamma\lambda=0.45$）</h4>
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>时刻</th><th>访问</th><th>δ</th><th>E(s₀)</th><th>E(s₁)</th><th>E(s₂)</th><th>E(s₃)</th></tr></thead>
   <tbody>
     <tr><td>t=0</td><td>s₀</td><td>+0.10</td><td><strong>1.0000</strong></td><td>0</td><td>0</td><td>0</td></tr>
@@ -773,7 +777,7 @@ V(s₀) + (−0.1666) = 4.5 − 0.1666 = 4.333  ✓</code></pre>
     <tr><td>t=2</td><td>s₂</td><td>−0.20</td><td><strong>0.2025</strong></td><td><strong>0.4500</strong></td><td><strong>1.0000</strong></td><td>0</td></tr>
     <tr><td>t=3</td><td>s₃</td><td>−1.00</td><td><strong>0.0911</strong></td><td><strong>0.2025</strong></td><td><strong>0.4500</strong></td><td><strong>1.0000</strong></td></tr>
   </tbody>
-</table>
+</table></div>
 <p>每行都在做：所有 E 先乘 0.45（衰减），然后把当前状态置为 1。看 s₀ 这一列：1 → 0.45 → 0.2025 → 0.0911。</p>
 <p>于是 s₀ 在整个 episode 里收到的总更新是：</p>
 <div class="math">$$\alpha\big[0.10\times1+(-0.30)\times0.45+(-0.20)\times0.2025+(-1.00)\times0.0911\big]=\alpha\times(-0.1666)$$</div>
@@ -837,7 +841,7 @@ V(s₀) + (−0.1666) = 4.5 − 0.1666 = 4.333  ✓</code></pre>
 </ul>
 
 <h3>9.4 工程上的对策</h3>
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>手段</th><th>针对哪个要素</th><th>怎么做</th></tr></thead>
   <tbody>
     <tr><td>目标网络</td><td>自举</td><td>用一份延迟更新的参数算目标：$\mathbf{w}^-\leftarrow\tau\mathbf{w}^-+(1-\tau)\mathbf{w}$</td></tr>
@@ -846,7 +850,7 @@ V(s₀) + (−0.1666) = 4.5 − 0.1666 = 4.333  ✓</code></pre>
     <tr><td>梯度裁剪 / 奖励归一化</td><td>数值稳定性</td><td>限制更新幅度</td></tr>
     <tr><td>分布化价值</td><td>表示能力</td><td>C51、QR-DQN</td></tr>
   </tbody>
-</table>
+</table></div>
 </section>
 
 <section class="chap" id="s10">
@@ -926,7 +930,7 @@ repeat:
 
 <h3>12.2 一个具体例子</h3>
 <p>两个动作，真实价值都是 0，但估计有噪声 $\pm1$ 等概率：</p>
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>$\hat Q(a_1)$</th><th>$\hat Q(a_2)$</th><th>$\max$</th></tr></thead>
   <tbody>
     <tr><td>+1</td><td>+1</td><td>+1</td></tr>
@@ -934,7 +938,7 @@ repeat:
     <tr><td>−1</td><td>+1</td><td>+1</td></tr>
     <tr><td>−1</td><td>−1</td><td>−1</td></tr>
   </tbody>
-</table>
+</table></div>
 <p>真实期望是 0，但 $\mathbb{E}[\max]=+0.5$。<strong>系统性高估 0.5。</strong></p>
 
 <h3>12.3 Double Q-learning</h3>
@@ -1054,7 +1058,7 @@ V(s)=\mathbb{E}_{a\sim\pi}\big[Q(s,a)-\alpha\log\pi(a|s)\big]$$</div>
 </div>
 
 <h3>14.7 算法谱系</h3>
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>算法</th><th>策略类型</th><th>动作空间</th><th>on/off</th><th>核心机制</th></tr></thead>
   <tbody>
     <tr><td>REINFORCE</td><td>随机</td><td>离散/连续</td><td>on</td><td>MC 策略梯度</td></tr>
@@ -1065,7 +1069,7 @@ V(s)=\mathbb{E}_{a\sim\pi}\big[Q(s,a)-\alpha\log\pi(a|s)\big]$$</div>
     <tr><td>TD3</td><td>确定性</td><td>连续</td><td>off</td><td>双 Q + 目标平滑</td></tr>
     <tr><td>SAC</td><td>随机</td><td>连续</td><td>off</td><td>最大熵 + 双 Q</td></tr>
   </tbody>
-</table>
+</table></div>
 </section>
 
 <section class="chap" id="s15">
@@ -1085,7 +1089,7 @@ V(s)=\mathbb{E}_{a\sim\pi}\big[Q(s,a)-\alpha\log\pi(a|s)\big]$$</div>
 <p>维护每个动作的后验 $p(\mu_a\mid\mathcal{D})$，每步从后验采样一组参数，选当前最优。遗憾接近理论下界 $O(\sqrt{KT\ln T})$。</p>
 
 <h3>15.3 深度 RL 的探索：内在奖励</h3>
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>方法</th><th>奖励信号</th><th>直觉</th></tr></thead>
   <tbody>
     <tr><td>Count-based</td><td>$r^{+}=\beta/\sqrt{N(s)}$</td><td>去得越少，奖励越大</td></tr>
@@ -1093,7 +1097,7 @@ V(s)=\mathbb{E}_{a\sim\pi}\big[Q(s,a)-\alpha\log\pi(a|s)\big]$$</div>
     <tr><td>RND（随机网络蒸馏）</td><td>$r^{+}=\|f_{\text{target}}(s)-f_{\text{pred}}(s)\|^2$</td><td>只在新状态上误差大</td></tr>
     <tr><td>Plan2Explore</td><td>$r^{+}=\operatorname{Var}_{\text{ensemble}}\big[\hat s_{t+1}\big]$</td><td>主动去找模型分歧大的地方</td></tr>
   </tbody>
-</table>
+</table></div>
 <div class="callout warn">
   <span class="label">内在奖励的经典失败模式：Noisy TV</span>
   <p>如果环境里有随机噪声源（比如雪花屏），预测误差永远很大，智能体会<strong>盯着噪声看</strong>而不去探索真正有用的地方。</p>
@@ -1199,7 +1203,7 @@ z_t&\sim p_\theta(z_t\mid h_t) &&\text{(先验，想象时用)}
 <section class="chap" id="s19">
 <h2><span class="num">19</span>四条轴</h2>
 <h3>19.1 轴一：有没有模型</h3>
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th></th><th>model-free</th><th>model-based</th></tr></thead>
   <tbody>
     <tr><td>学什么</td><td>直接学 $V,Q,\pi$</td><td>先学 $P,R$，再规划</td></tr>
@@ -1207,29 +1211,29 @@ z_t&\sim p_\theta(z_t\mid h_t) &&\text{(先验，想象时用)}
     <tr><td>风险</td><td>无模型误差</td><td>模型误差进入策略</td></tr>
     <tr><td>代表</td><td>DQN、PPO、SAC</td><td>Dreamer、MuZero、TD-MPC</td></tr>
   </tbody>
-</table>
+</table></div>
 
 <h3>19.2 轴二：采样 × 自举</h3>
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th></th><th>不自举（用到终局）</th><th>自举（一步 + 估计）</th></tr></thead>
   <tbody>
     <tr><td><strong>有完整模型</strong></td><td>穷举搜索</td><td>动态规划</td></tr>
     <tr><td><strong>无模型</strong></td><td>蒙特卡洛</td><td>时序差分</td></tr>
   </tbody>
-</table>
+</table></div>
 
 <h3>19.3 轴三：学什么</h3>
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>类型</th><th>学</th><th>更新</th><th>优点</th><th>缺点</th></tr></thead>
   <tbody>
     <tr><td>value-based</td><td>$Q$</td><td>TD + argmax</td><td>稳、样本效率高</td><td>只能离散动作、确定性</td></tr>
     <tr><td>policy-based</td><td>$\pi$</td><td>策略梯度</td><td>连续动作、随机策略</td><td>方差大</td></tr>
     <tr><td>actor-critic</td><td>$\pi+V$</td><td>优势加权梯度</td><td>两者兼得</td><td>要调两个网络</td></tr>
   </tbody>
-</table>
+</table></div>
 
 <h3>19.4 轴四：on / off-policy</h3>
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th></th><th>on-policy</th><th>off-policy</th></tr></thead>
   <tbody>
     <tr><td>数据来源</td><td>当前策略</td><td>任意策略（含人类）</td></tr>
@@ -1237,10 +1241,10 @@ z_t&\sim p_\theta(z_t\mid h_t) &&\text{(先验，想象时用)}
     <tr><td>稳定性</td><td>好</td><td>可能发散</td></tr>
     <tr><td>代表</td><td>PPO、A2C</td><td>DQN、SAC、Dreamer</td></tr>
   </tbody>
-</table>
+</table></div>
 
 <h3>19.5 算法总表</h3>
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>算法</th><th>要模型</th><th>自举</th><th>学什么</th><th>on/off</th><th>动作</th></tr></thead>
   <tbody>
     <tr><td>策略迭代 / 价值迭代</td><td>是（已知）</td><td>是</td><td>$V$</td><td>—</td><td>离散</td></tr>
@@ -1258,7 +1262,7 @@ z_t&\sim p_\theta(z_t\mid h_t) &&\text{(先验，想象时用)}
     <tr><td>MuZero</td><td>是（学的）</td><td>是</td><td>$\pi+V$</td><td>off</td><td>离散</td></tr>
     <tr><td>Dreamer</td><td>是（学的）</td><td>是</td><td>$\pi+V$</td><td>off</td><td>都行</td></tr>
   </tbody>
-</table>
+</table></div>
 </section>
 
 <section class="chap" id="s20">
@@ -1282,7 +1286,7 @@ z_t&\sim p_\theta(z_t\mid h_t) &&\text{(先验，想象时用)}
 
 <section class="chap" id="s21">
 <h2><span class="num">21</span>实务必踩的坑</h2>
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>现象</th><th>可能原因</th><th>对策</th></tr></thead>
   <tbody>
     <tr><td>Q 值爆炸</td><td>自举放大误差、奖励尺度太大</td><td>目标网络、奖励归一化、梯度裁剪、Double Q</td></tr>
@@ -1293,7 +1297,7 @@ z_t&\sim p_\theta(z_t\mid h_t) &&\text{(先验，想象时用)}
     <tr><td>PPO 更新后策略崩掉</td><td>KL 太大、ratio 截断失效</td><td>监控 KL、自适应学习率、限制 epoch</td></tr>
     <tr><td>离线 RL 学到"幻觉动作"</td><td>OOD 动作被高估</td><td>悲观惩罚（CQL）、策略约束、只信数据支撑区</td></tr>
   </tbody>
-</table>
+</table></div>
 <div class="callout warn">
   <span class="label">一条最重要的实践原则</span>
   <p><strong>先让评测可信，再谈算法。</strong>一个不可信的评测会让你在错误的算法上迭代几个月。</p>
@@ -1303,7 +1307,7 @@ z_t&\sim p_\theta(z_t\mid h_t) &&\text{(先验，想象时用)}
 
 <section class="chap" id="sA">
 <h2><span class="num">A</span>公式卡</h2>
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>名称</th><th>公式</th></tr></thead>
   <tbody>
     <tr><td>回报</td><td>$G_t=\sum_{k\ge0}\gamma^k r_{t+k},\quad G_t=r_t+\gamma G_{t+1}$</td></tr>
@@ -1329,7 +1333,7 @@ z_t&\sim p_\theta(z_t\mid h_t) &&\text{(先验，想象时用)}
     <tr><td>KL</td><td>$D_{KL}(p\|q)=\sum_x p(x)\log\frac{p(x)}{q(x)}\ge0$</td></tr>
     <tr><td>熵</td><td>$\mathcal{H}(\pi)=-\sum_a\pi(a)\log\pi(a)$</td></tr>
   </tbody>
-</table>
+</table></div>
 </section>
 
 <section class="chap" id="sB">
@@ -1354,7 +1358,7 @@ z_t&\sim p_\theta(z_t\mid h_t) &&\text{(先验，想象时用)}
 
 <section class="chap" id="sC">
 <h2><span class="num">C</span>术语表</h2>
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>英文</th><th>中文</th><th>一句话</th></tr></thead>
   <tbody>
     <tr><td>MDP</td><td>马尔可夫决策过程</td><td>序贯决策的标准形式</td></tr>
@@ -1380,7 +1384,7 @@ z_t&\sim p_\theta(z_t\mid h_t) &&\text{(先验，想象时用)}
     <tr><td>value equivalence</td><td>价值等价</td><td>只要求价值一致，不要求重建</td></tr>
     <tr><td>latent dynamics</td><td>隐空间动力学</td><td>在压缩表示上预测未来</td></tr>
   </tbody>
-</table>
+</table></div>
 </section>
 
 <footer>
@@ -1389,6 +1393,7 @@ z_t&\sim p_\theta(z_t\mid h_t) &&\text{(先验，想象时用)}
 </main>
 </div>
 
+<div id="scrim"></div>
 <a id="toTop" href="#top" title="回到顶部" aria-label="回到顶部">↑</a>
 
 <script>
@@ -1422,6 +1427,33 @@ z_t&\sim p_\theta(z_t\mid h_t) &&\text{(先验，想象时用)}
       setTheme(root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
     });
   }
+
+  /* ================= 移动端抽屉 ================= */
+  var navBtn   = document.getElementById('navBtn');
+  var navClose = document.getElementById('navClose');
+  var scrim    = document.getElementById('scrim');
+
+  function openNav(){
+    document.body.classList.add('nav-open');
+    if (navBtn) navBtn.setAttribute('aria-expanded', 'true');
+  }
+  function closeNav(){
+    document.body.classList.remove('nav-open');
+    if (navBtn) navBtn.setAttribute('aria-expanded', 'false');
+  }
+  if (navBtn){
+    navBtn.addEventListener('click', function(){
+      document.body.classList.contains('nav-open') ? closeNav() : openNav();
+    });
+  }
+  if (navClose) navClose.addEventListener('click', closeNav);
+  if (scrim) scrim.addEventListener('click', closeNav);
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape' || e.keyCode === 27) closeNav();
+  });
+  window.addEventListener('resize', function(){
+    if (window.innerWidth > 1080) closeNav();
+  });
 
   /* ================= 目录跳转 ================= */
   var links = [].slice.call(document.querySelectorAll('#toc a'));
@@ -1462,6 +1494,7 @@ z_t&\sim p_\theta(z_t\mid h_t) &&\text{(先验，想象时用)}
   function jumpTo(id){
     var el = document.getElementById(id);
     if (!el) return;
+    closeNav();
     setActive(id);
     lockId = id;
     clearTimeout(unlockTimer);

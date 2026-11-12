@@ -49,6 +49,9 @@ for i in ORDER:
         f'{s["body"]}\n</section>'
     )
 body = "\n\n".join(parts)
+# 表格加横向滚动容器，避免撑破移动端宽度
+body = body.replace("<table>", '<div class="table-wrap"><table>')
+body = body.replace("</table>", "</table></div>")
 
 HEAD = """<!DOCTYPE html>
 <html lang="zh-CN">
@@ -71,6 +74,9 @@ HEAD = """<!DOCTYPE html>
 </head>
 <body id="top">
 <div id="progress"></div>
+<button id="navBtn" type="button" aria-label="打开目录" aria-expanded="false" aria-controls="toc">
+  <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+</button>
 <div class="layout">
 
 <aside>
@@ -79,6 +85,7 @@ HEAD = """<!DOCTYPE html>
     <svg class="i-moon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
     <svg class="i-sun" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.2v2.2M12 19.6v2.2M2.2 12h2.2M19.6 12h2.2M4.9 4.9l1.6 1.6M17.5 17.5l1.6 1.6M19.1 4.9l-1.6 1.6M6.5 17.5l-1.6 1.6"/></svg>
   </button>
+  <button id="navClose" type="button" aria-label="关闭目录">×</button>
   <nav id="toc">
     __SIDEBAR__
   </nav>
@@ -109,6 +116,7 @@ __BODY__
 </main>
 </div>
 
+<div id="scrim"></div>
 <a id="toTop" href="#top" title="回到顶部" aria-label="回到顶部">↑</a>
 
 <script>
@@ -142,6 +150,33 @@ __BODY__
       setTheme(root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
     });
   }
+
+  /* ================= 移动端抽屉 ================= */
+  var navBtn   = document.getElementById('navBtn');
+  var navClose = document.getElementById('navClose');
+  var scrim    = document.getElementById('scrim');
+
+  function openNav(){
+    document.body.classList.add('nav-open');
+    if (navBtn) navBtn.setAttribute('aria-expanded', 'true');
+  }
+  function closeNav(){
+    document.body.classList.remove('nav-open');
+    if (navBtn) navBtn.setAttribute('aria-expanded', 'false');
+  }
+  if (navBtn){
+    navBtn.addEventListener('click', function(){
+      document.body.classList.contains('nav-open') ? closeNav() : openNav();
+    });
+  }
+  if (navClose) navClose.addEventListener('click', closeNav);
+  if (scrim) scrim.addEventListener('click', closeNav);
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape' || e.keyCode === 27) closeNav();
+  });
+  window.addEventListener('resize', function(){
+    if (window.innerWidth > 1080) closeNav();
+  });
 
   /* ================= 目录跳转 ================= */
   var links = [].slice.call(document.querySelectorAll('#toc a'));
@@ -182,6 +217,7 @@ __BODY__
   function jumpTo(id){
     var el = document.getElementById(id);
     if (!el) return;
+    closeNav();
     setActive(id);
     lockId = id;
     clearTimeout(unlockTimer);
